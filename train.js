@@ -1,5 +1,3 @@
-
-
 import * as THREE from 'three';
 import { createCarMesh } from './assets.js';
 import { TRAIN_LENGTH_RATIO, CAR_GAP, CarType } from './constants.js';
@@ -67,6 +65,8 @@ export class Train {
     }
 
     update(delta) {
+        if (isNaN(delta)) return;
+
         // Station Stop Logic
         if (this.state === 'STOPPED') {
             this.stopTimer -= delta;
@@ -110,22 +110,27 @@ export class Train {
 
         this.cars.forEach((car) => {
             // Calculate T for this car.
-            // Since cars are always ordered 0 to 3 descending in T, we simply subtract the offset.
             const t = this.progress - car.offset;
             
+            if (isNaN(t)) return;
+
             // Safety Clamp to ensure getPointAt doesn't fail
             const clampedT = Math.max(0.0001, Math.min(0.9999, t));
             
             const position = this.curve.getPointAt(clampedT);
             const tangent = this.curve.getTangentAt(clampedT);
             
-            if (position && tangent && typeof position.x === 'number') {
+            // Explicit checks for position AND tangent being valid objects with x,y,z
+            if (position && typeof position.x === 'number' && 
+                tangent && typeof tangent.x === 'number') {
+                
                 car.group.position.copy(position);
                 
-                // Always look along the tangent (Forward direction of track 0->1).
-                // Do NOT flip lookAt based on direction. 
+                // Safe lookAt
                 const lookTarget = position.clone().add(tangent);
-                car.group.lookAt(lookTarget);
+                if (lookTarget && typeof lookTarget.x === 'number') {
+                    car.group.lookAt(lookTarget);
+                }
             }
         });
     }

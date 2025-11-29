@@ -1,4 +1,3 @@
-
 import * as THREE from 'three';
 import { COLORS, TRACK_HEIGHT, PIER_SPACING, CarType, TRACK_LEFT, TRACK_RIGHT, TAXI_PATH } from './constants.js';
 import { createBox, createCylinder, createPlane } from './utils.js';
@@ -45,7 +44,7 @@ export function createTrack(curve, scene) {
 
       const dummy = new THREE.Object3D();
       dummy.position.copy(position);
-      if (tangent) {
+      if (tangent && typeof tangent.x === 'number') {
           dummy.lookAt(position.clone().add(tangent));
       }
       
@@ -102,7 +101,7 @@ export function createTrack(curve, scene) {
   const p0 = curve.getPointAt(0);
   const t0 = curve.getTangentAt(0);
   // Ensure p0 exists and has x property
-  if(p0 && typeof p0.x === 'number' && t0) {
+  if(p0 && typeof p0.x === 'number' && t0 && typeof t0.x === 'number') {
       const b0 = new THREE.Mesh(bumperGeo, bumperMat);
       b0.position.copy(p0);
       b0.position.y += 1.0; // Sit on top of beam
@@ -119,7 +118,7 @@ export function createTrack(curve, scene) {
   const p1 = curve.getPointAt(1);
   const t1 = curve.getTangentAt(1);
   // Ensure p1 exists and has x property
-  if(p1 && typeof p1.x === 'number' && t1) {
+  if(p1 && typeof p1.x === 'number' && t1 && typeof t1.x === 'number') {
       const b1 = new THREE.Mesh(bumperGeo, bumperMat);
       b1.position.copy(p1);
       b1.position.y += 1.0;
@@ -295,6 +294,8 @@ class NewsHelicopter {
     }
 
     updateHelicopterControls(delta) {
+        if (isNaN(delta)) return;
+
         const gamepads = navigator.getGamepads ? navigator.getGamepads() : [];
         let gp = null;
         for (let i = 0; i < 4; i++) {
@@ -305,11 +306,12 @@ class NewsHelicopter {
         }
 
         if (gp) {
-            const leftStickX = Math.abs(gp.axes[0]) > 0.15 ? gp.axes[0] : 0;
-            const leftStickY = Math.abs(gp.axes[1]) > 0.15 ? gp.axes[1] : 0;
-            const rightStickX = Math.abs(gp.axes[2]) > 0.15 ? gp.axes[2] : 0;
+            const leftStickX = (gp.axes && Math.abs(gp.axes[0]) > 0.15) ? gp.axes[0] : 0;
+            const leftStickY = (gp.axes && Math.abs(gp.axes[1]) > 0.15) ? gp.axes[1] : 0;
+            const rightStickX = (gp.axes && Math.abs(gp.axes[2]) > 0.15) ? gp.axes[2] : 0;
+            
             const getBtn = (idx) => {
-                if (!gp.buttons[idx]) return 0;
+                if (!gp.buttons || !gp.buttons[idx]) return 0;
                 return typeof gp.buttons[idx] === 'number' ? gp.buttons[idx] : gp.buttons[idx].value;
             };
             const rightTrigger = getBtn(7);
@@ -341,7 +343,8 @@ class NewsHelicopter {
             
             for (let i = 0; i < intersects.length; i++) {
                 const hit = intersects[i];
-                if (!hit || !hit.point) continue; // Safety check
+                // STRICT CHECK: Ensure hit and point exist before accessing components
+                if (!hit || !hit.point || typeof hit.point.y !== 'number') continue;
 
                 // Ensure we don't hit ourselves
                 let isSelf = false;
@@ -444,7 +447,6 @@ class NewsHelicopter {
     }
 }
 
-// ... rest of file (createCarMesh, etc.) remains unchanged ...
 export function createCarMesh(type, color) {
   const group = new THREE.Group();
   const isHead = type === CarType.HEAD;
@@ -546,7 +548,6 @@ export function createCarMesh(type, color) {
   return group;
 }
 
-// ... helper components remain unchanged ...
 const createTicketMachine = (x, y, z, rotY=0, parent) => {
     const g = new THREE.Group();
     g.position.set(x, y, z);
@@ -584,7 +585,7 @@ const createTurnstile = (x, y, z, parent) => {
 class TrafficCar {
   constructor(curve, initialProgress, speed, color, audioGenerator) {
     this.curve = curve;
-    this.progress = initialProgress;
+    this.progress = initialProgress || 0;
     this.speed = speed; 
     this.color = color;
     
@@ -618,20 +619,31 @@ class TrafficCar {
   }
 
   update(delta) {
+    if (isNaN(delta)) return;
+
     const LOOP_SPEED_SCALE = 0.0005; 
+    
+    // SAFETY: Initialize progress if undefined or NaN
+    if (isNaN(this.progress)) this.progress = 0;
+
     this.progress += this.speed * delta * LOOP_SPEED_SCALE;
     if (this.progress > 1) this.progress -= 1;
 
     if (!this.curve || !this.curve.getPointAt) return;
 
     const pos = this.curve.getPointAt(this.progress);
-    const nextPos = this.curve.getPointAt((this.progress + 0.005) % 1);
+    const nextT = (this.progress + 0.005) % 1;
+    const nextPos = this.curve.getPointAt(nextT);
 
-    if (pos && nextPos && typeof pos.x === 'number') {
+    // SAFETY: Strict checks on Vector3 properties
+    if (pos && typeof pos.x === 'number' && !isNaN(pos.x)) {
         this.group.position.copy(pos);
-        const m = new THREE.Matrix4();
-        m.lookAt(pos, nextPos, new THREE.Vector3(0, 1, 0));
-        this.group.quaternion.setFromRotationMatrix(m);
+        
+        if (nextPos && typeof nextPos.x === 'number' && !isNaN(nextPos.x)) {
+            const m = new THREE.Matrix4();
+            m.lookAt(pos, nextPos, new THREE.Vector3(0, 1, 0));
+            this.group.quaternion.setFromRotationMatrix(m);
+        }
     }
   }
 }
@@ -716,20 +728,30 @@ export class HeroTaxi {
     }
 
     update(delta) {
+        if (isNaN(delta)) return;
+
         const LOOP_SPEED_SCALE = 0.0005; 
+        
+        if (isNaN(this.progress)) this.progress = 0;
+
         this.progress += this.speed * delta * LOOP_SPEED_SCALE;
         if (this.progress > 1) this.progress -= 1;
 
         if (!this.curve || !this.curve.getPointAt) return;
 
         const pos = this.curve.getPointAt(this.progress);
-        const nextPos = this.curve.getPointAt((this.progress + 0.005) % 1);
+        const nextT = (this.progress + 0.005) % 1;
+        const nextPos = this.curve.getPointAt(nextT);
 
-        if (pos && nextPos && typeof pos.x === 'number') {
+        // SAFETY: Strict checks on Vector3 properties
+        if (pos && typeof pos.x === 'number' && !isNaN(pos.x)) {
             this.group.position.copy(pos);
-            const m = new THREE.Matrix4();
-            m.lookAt(pos, nextPos, new THREE.Vector3(0, 1, 0));
-            this.group.quaternion.setFromRotationMatrix(m);
+            
+            if (nextPos && typeof nextPos.x === 'number' && !isNaN(nextPos.x)) {
+                const m = new THREE.Matrix4();
+                m.lookAt(pos, nextPos, new THREE.Vector3(0, 1, 0));
+                this.group.quaternion.setFromRotationMatrix(m);
+            }
         }
     }
 
@@ -742,7 +764,6 @@ export class HeroTaxi {
     }
 }
 
-// ... createTunnelGeometry ...
 const createTunnelGeometry = (scene) => {
     const allPoints = TAXI_PATH.getSpacedPoints(600);
     const tunnelPoints = allPoints.filter(p => p.y < -0.1 || (p.z > 70 && p.z < 150) || (p.z < -190 && p.z > -260));
@@ -798,7 +819,6 @@ const createTunnelGeometry = (scene) => {
     }
 }
 
-// ... createTunnelSignage, createFifthAvePavement, createDetailedBrickBuilding ...
 const createTunnelSignage = (scene) => {
     const createSignPost = (x, z, rotY) => {
         const group = new THREE.Group();
@@ -819,7 +839,6 @@ export const createFifthAvePavement = (scene) => {
     const voxels = [];
     const voxelSize = 0.5;
     
-    // ... colors ...
     const C_ASPHALT_BASE = new THREE.Color('#252525');
     const C_ASPHALT_NOISE = new THREE.Color('#2A2A2A');
     const C_MARKING_WHITE = new THREE.Color('#FFFFFF'); 
@@ -984,15 +1003,13 @@ export const createFifthAvePavement = (scene) => {
     return mesh;
 };
 
-// ... createDetailedBrickBuilding ... (abbreviated)
 const createDetailedBrickBuilding = (x, z, floors, width, depth, color, scene) => {
-    // ... (unchanged) ...
     const group = new THREE.Group();
     group.position.set(x, 0, z);
 
     const floorHeight = 4;
     createBox(width, 5, depth, '#2F2F2F', 0, 2.5, 0, group);
-    // ... rest of function ...
+    
     createBox(width - 2, 3.5, depth + 0.1, '#FFAA55', 0, 2.5, 0, group).material.emissive = new THREE.Color('#553311');
     createBox(width - 1.5, 0.5, depth + 0.2, '#111', 0, 4.5, 0, group); 
 
@@ -1078,7 +1095,6 @@ const createDetailedBrickBuilding = (x, z, floors, width, depth, color, scene) =
     if(scene) scene.add(group);
 };
 
-// ... createDetailedGlassTower, createBrutalistBlock, etc ...
 const createDetailedGlassTower = (x, z, floors, width, color, scene) => {
     const group = new THREE.Group();
     group.position.set(x, 0, z);
@@ -1192,7 +1208,6 @@ const createStackedApartments = (x, z, scene) => {
     if (scene) scene.add(group);
 };
 
-// ... createArmory, createMuralAmphitheater, createChihulyGarden, createPacificScienceCenter ...
 const createArmory = (x, y, z, parent) => {
     const g = new THREE.Group();
     g.position.set(x, y, z);
@@ -1563,7 +1578,6 @@ function createSteppedLobe(scene, center, dimensions, colorHex, matParams, shape
     parent.add(mesh);
 }
 
-// ... SpaceNeedle, Elevator, createTunnelPortal ...
 const NEEDLE_PALETTE = {
   LEG_WHITE: '#FFFFFF',        
   CORE_CONCRETE: '#DDDDDD',    
@@ -2291,7 +2305,6 @@ const createTunnelPortal = (z, isNorth, scene, length=8) => {
     scene.add(group);
 }
 
-// ... WestlakeMall and createEnvironment exports ...
 class WestlakeMall {
     constructor(parent, x, z, audioGenerator) {
         this.group = new THREE.Group();
