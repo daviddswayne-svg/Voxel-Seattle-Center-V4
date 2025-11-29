@@ -1371,7 +1371,6 @@ const createPacificScienceCenter = (x, z, parent) => {
     const group = new THREE.Group();
     group.position.set(x, 0, z);
     
-    // 1. POOL (Large Blue Reflection)
     const poolW = 90;
     const poolL = 160;
     const waterGeo = new THREE.BoxGeometry(poolW, 0.5, poolL);
@@ -1389,68 +1388,47 @@ const createPacificScienceCenter = (x, z, parent) => {
     water.receiveShadow = true;
     group.add(water);
     
-    // White Pool Coping/Edge
     createBox(poolW + 4, 1, poolL + 4, '#FFFFFF', 0, -0.5, 0, group);
-    createBox(poolW + 6, 0.2, poolL + 6, '#DDDDDD', 0, 0.1, 0, group); // Pavement base
+    createBox(poolW + 6, 0.2, poolL + 6, '#DDDDDD', 0, 0.1, 0, group); 
 
-    // 2. THE 5 SPACE GOTHIC TOWERS (Instanced)
     const towerVoxels = [];
-    const vSize = 0.5; // High Detail
+    const vSize = 0.5; 
     
     const towerH = 50;
-    const baseWidth = 3; // Narrow waist
-    const topWidth = 24; // Wide flare
+    const baseWidth = 3;
+    const topWidth = 24; 
     
-    // Generate one tower
     for (let y = 0; y <= towerH; y += vSize) {
-        const t = y / towerH; // 0 to 1
+        const t = y / towerH; 
         
-        // Exponential Flare Function
-        // Starts straight, then flares drastically at the top
-        // y = x^3 type curve
         const flareFactor = Math.pow(Math.max(0, t - 0.3) / 0.7, 2.5);
         const currentW = baseWidth + (topWidth - baseWidth) * flareFactor;
         const halfW = currentW / 2;
         
         const isLatticeZone = t > 0.4;
         
-        // We build the tower from 4 corner legs that fan out
-        // Bounds for this slice
         const limit = halfW + 0.5;
         
         for (let lx = -limit; lx <= limit; lx += vSize) {
             for (let lz = -limit; lz <= limit; lz += vSize) {
-                // Check if this voxel is part of the structure
-                
-                // 1. Distance from center axis (taxicab or euclidean?)
-                // Use Max for square profile
                 const distX = Math.abs(lx);
                 const distZ = Math.abs(lz);
                 
-                // Are we on the edge of the square profile?
                 const onEdge = (distX > halfW - 0.6) || (distZ > halfW - 0.6);
                 
-                if (!onEdge) continue; // Hollow inside
+                if (!onEdge) continue; 
                 
                 let isSolid = false;
                 
                 if (isLatticeZone) {
-                    // Create the lattice pattern (criss-cross)
-                    // Pattern: (x + y + z) % period
-                    const scale = 2.0; // Lattice size
+                    const scale = 2.0; 
                     const pat = (Math.floor(lx/scale) + Math.floor(y/scale) + Math.floor(lz/scale)) % 2;
                     
-                    // Solid rim at the very top
                     if (t > 0.96) isSolid = true;
-                    // Corners are always solid (structural ribs)
                     else if (distX > halfW - 0.6 && distZ > halfW - 0.6) isSolid = true;
-                    // Lattice fill on the faces
                     else if (pat === 0) isSolid = true;
                     
                 } else {
-                    // Base: Solid pillars at the corners
-                    // Actually, at the base, it's a tight bundle.
-                    // 4 legs
                     if (distX > halfW - 0.8 && distZ > halfW - 0.8) isSolid = true;
                 }
                 
@@ -1468,12 +1446,11 @@ const createPacificScienceCenter = (x, z, parent) => {
     const dummy = new THREE.Object3D();
     let idx = 0;
     
-    // Instance the 5 towers
     for (let i = 0; i < 5; i++) {
-        const zPos = (i - 2) * 30; // Spacing: -60, -30, 0, 30, 60
+        const zPos = (i - 2) * 30; 
         towerVoxels.forEach(v => {
             if (v && typeof v.x === 'number') {
-                dummy.position.set(v.x, v.y + 0.5, v.z + zPos); // +0.5 to sit on water
+                dummy.position.set(v.x, v.y + 0.5, v.z + zPos); 
                 dummy.updateMatrix();
                 towerMesh.setMatrixAt(idx++, dummy.matrix);
             }
@@ -1483,19 +1460,14 @@ const createPacificScienceCenter = (x, z, parent) => {
     towerMesh.receiveShadow = true;
     group.add(towerMesh);
     
-    // 3. FOUNTAINS (Onion Shape Wireframes)
     const fountainVoxels = [];
     const fSize = 0.25;
     
-    // Parametric Onion Shape
-    // r = sin(t * PI)
     const fHeight = 6;
     for (let fy = 0; fy <= fHeight; fy += fSize) {
         const t = fy / fHeight;
-        // Onion curve: Bulges at bottom, tapers to point
         const r = 2.5 * Math.sin(t * Math.PI); 
         
-        // Create ribs (8 ribs)
         const ribs = 8;
         for(let rIdx = 0; rIdx < ribs; rIdx++) {
             const angle = (rIdx / ribs) * Math.PI * 2;
@@ -1507,12 +1479,11 @@ const createPacificScienceCenter = (x, z, parent) => {
     
     const fGeo = new THREE.BoxGeometry(fSize, fSize, fSize);
     const fMat = new THREE.MeshStandardMaterial({ color: '#FFFFFF', emissive: '#FFFFFF', emissiveIntensity: 0.5 });
-    // 6 fountains between towers? No, likely 4 gaps. Let's do 4 fountains.
     const fMesh = new THREE.InstancedMesh(fGeo, fMat, fountainVoxels.length * 4);
     idx = 0;
     
     for(let i=0; i<4; i++) {
-        const zPos = (i - 1.5) * 30; // Centered in the gaps
+        const zPos = (i - 1.5) * 30; 
         fountainVoxels.forEach(v => {
             if (v && typeof v.x === 'number') {
                 dummy.position.set(v.x, v.y + 0.5, v.z + zPos);
@@ -1523,8 +1494,6 @@ const createPacificScienceCenter = (x, z, parent) => {
     }
     group.add(fMesh);
     
-    // 4. BACKGROUND BUILDINGS (Textured Walls)
-    // Low profile, white, diagonal texture
     const wallL = 160;
     const wallH = 18;
     const wallW = 4;
@@ -1533,12 +1502,9 @@ const createPacificScienceCenter = (x, z, parent) => {
     
     for(let wy = 0; wy < wallH; wy += wvSize) {
         for(let wz = -wallL/2; wz < wallL/2; wz += wvSize) {
-            // Diagonal Pattern: (y + z) % N
             const diag = (wy + wz); 
-            // Create zig-zag depth
             const depthMod = Math.abs(diag % 8 - 4) < 2 ? 0 : 1; 
             
-            // Base thickness
             for(let wx = 0; wx < wallW + depthMod; wx += wvSize) {
                 wVoxels.push({x: wx, y: wy, z: wz});
             }
@@ -1546,11 +1512,10 @@ const createPacificScienceCenter = (x, z, parent) => {
     }
     
     const wGeo = new THREE.BoxGeometry(wvSize, wvSize, wvSize);
-    const wMat = new THREE.MeshStandardMaterial({ color: '#F0F0F0', roughness: 0.6 }); // Off-white
+    const wMat = new THREE.MeshStandardMaterial({ color: '#F0F0F0', roughness: 0.6 }); 
     const wMesh = new THREE.InstancedMesh(wGeo, wMat, wVoxels.length * 2);
     
     idx = 0;
-    // East Wall
     wVoxels.forEach(v => {
         if (v && typeof v.x === 'number') {
             dummy.position.set(v.x + (poolW/2 + 2), v.y + 0.5, v.z);
@@ -1559,13 +1524,10 @@ const createPacificScienceCenter = (x, z, parent) => {
             wMesh.setMatrixAt(idx++, dummy.matrix);
         }
     });
-    // West Wall (Mirrored position)
     wVoxels.forEach(v => {
         if (v && typeof v.x === 'number') {
-            // Flip X for the voxel coord to mirror texture pattern direction if desired, 
-            // or just move position.
             dummy.position.set(-(v.x + (poolW/2 + 2)), v.y + 0.5, v.z);
-            dummy.rotation.set(0, Math.PI, 0); // Face inward
+            dummy.rotation.set(0, Math.PI, 0); 
             dummy.updateMatrix();
             wMesh.setMatrixAt(idx++, dummy.matrix);
         }
@@ -2375,6 +2337,358 @@ const createTunnelPortal = (z, isNorth, scene, length=8) => {
     scene.add(group);
 }
 
+// --- WESTLAKE MALL (Detailed Voxel Art) ---
+class WestlakeMall {
+    constructor(parent, x, z, audioGenerator) {
+        this.group = new THREE.Group();
+        this.group.position.set(x, 0, z);
+        parent.add(this.group);
+        
+        this.gears = [];
+        
+        // Configuration
+        const LEVEL_3_Y = 20; // Atrium floor (Above monorail Y=12)
+        const LEVEL_4_Y = 32; // Mezzanine floor
+        const WIDTH = 46;
+        const DEPTH = 50;
+        
+        this.buildStructure(WIDTH, DEPTH, LEVEL_3_Y, LEVEL_4_Y);
+        this.buildEscalators(LEVEL_3_Y, LEVEL_4_Y);
+        this.buildShops(LEVEL_4_Y);
+        this.buildVegetation(LEVEL_3_Y);
+        
+        // Ambient Mall Audio
+        if (audioGenerator) {
+             const sound = audioGenerator.createPositionalAudio('MOPOP', 60, 400, 0.4); 
+             if (sound) this.group.add(sound);
+        }
+    }
+
+    update(delta) {
+        // Animate Gears
+        this.gears.forEach((gear, i) => {
+            // Alternate rotation direction
+            const dir = i % 2 === 0 ? 1 : -1;
+            gear.rotation.y += delta * 1.5 * dir;
+        });
+    }
+    
+    buildStructure(w, d, y3, y4) {
+        const pillarColor = '#9999AA'; // Concrete
+        const pillarW = 2.5;
+        const roofY = y4 + 16; 
+
+        // 1. Columns (Extended to Roof)
+        const colsX = [ -19, -10, 10, 19 ];
+        const colsZ = [ -22, 0, 22 ];
+        
+        colsX.forEach(cx => {
+            colsZ.forEach(cz => {
+                if (Math.abs(cx) < 8) return; 
+                // Pillar from y3 to roof
+                const h = roofY - y3;
+                createBox(pillarW, h, pillarW, pillarColor, cx, y3 + h/2, cz, this.group);
+            });
+        });
+        
+        // 2. Level 3 Floor (Atrium)
+        const floorGroup = new THREE.Group();
+        floorGroup.position.y = y3;
+        this.group.add(floorGroup);
+        
+        createBox(w, 1, d, '#DDDDDD', 0, -0.5, 0, floorGroup);
+        
+        const tSize = 0.5;
+        const tVoxels = [];
+        const colors = ['#FFFFFF', '#EEDDCC', '#CCEEFF']; 
+        
+        for(let x=-w/2; x<w/2; x+=tSize) {
+            for(let z=-d/2; z<d/2; z+=tSize) {
+                if (Math.abs(x) < 5 && Math.abs(z) < 12) continue; // Escalator Pit
+                if (Math.random() > 0.85) {
+                    const col = colors[Math.floor(Math.random() * colors.length)];
+                    tVoxels.push({x: x + tSize/2, y: 0.05, z: z + tSize/2, color: col});
+                }
+            }
+        }
+        
+        if (tVoxels.length > 0) {
+            const geo = new THREE.BoxGeometry(tSize, 0.1, tSize);
+            const mat = new THREE.MeshStandardMaterial({ roughness: 0.2 });
+            const mesh = new THREE.InstancedMesh(geo, mat, tVoxels.length);
+            const dummy = new THREE.Object3D();
+            const c = new THREE.Color();
+            tVoxels.forEach((v, i) => {
+                dummy.position.set(v.x, v.y, v.z);
+                dummy.updateMatrix();
+                mesh.setMatrixAt(i, dummy.matrix);
+                c.set(v.color);
+                mesh.setColorAt(i, c);
+            });
+            mesh.instanceMatrix.needsUpdate = true;
+            if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true;
+            floorGroup.add(mesh);
+        }
+        
+        // 3. Level 4 (Full Upper Floor with Atrium Void)
+        const f4 = new THREE.Group();
+        f4.position.y = y4;
+        this.group.add(f4);
+        
+        const f4Thick = 1;
+        const f4Color = '#EEEEEE';
+        
+        // West Slab 
+        createBox(16, f4Thick, d, f4Color, -15, -f4Thick/2, 0, f4);
+
+        // East Slab 
+        createBox(16, f4Thick, d, f4Color, 15, -f4Thick/2, 0, f4);
+        
+        // North Slab (Landing)
+        createBox(14, f4Thick, 16, f4Color, 0, -f4Thick/2, -17, f4);
+        
+        // South Slab (Balcony)
+        createBox(14, f4Thick, 14, f4Color, 0, -f4Thick/2, 18, f4);
+
+        // Railing
+        const railH = 1.1;
+        const railMat = new THREE.MeshStandardMaterial({
+            color: '#AACCFF', transparent: true, opacity: 0.4
+        });
+        const addRail = (rw, rd, rx, rz) => {
+            const m = new THREE.Mesh(new THREE.BoxGeometry(rw, railH, rd), railMat);
+            m.position.set(rx, railH/2, rz);
+            f4.add(m);
+        };
+        addRail(0.2, 20, -7.1, 1);
+        addRail(0.2, 20, 7.1, 1);
+        addRail(14.2, 0.2, 0, -9.1);
+        addRail(14.2, 0.2, 0, 11.1);
+        
+        // 4. Glass Enclosure
+        const glassH = roofY - y3;
+        const gGroup = new THREE.Group();
+        gGroup.position.y = y3 + glassH/2;
+        this.group.add(gGroup);
+        
+        const wallMat = new THREE.MeshStandardMaterial({
+            color: '#DDEEFF', transparent: true, opacity: 0.15, 
+            roughness: 0.0, metalness: 0.8, side: THREE.DoubleSide
+        });
+        
+        const wWall = new THREE.Mesh(new THREE.BoxGeometry(0.5, glassH, d), wallMat);
+        wWall.position.x = -w/2;
+        gGroup.add(wWall);
+        
+        const eWall = new THREE.Mesh(new THREE.BoxGeometry(0.5, glassH, d), wallMat);
+        eWall.position.x = w/2;
+        gGroup.add(eWall);
+        
+        const nWall = new THREE.Mesh(new THREE.BoxGeometry(w, glassH, 0.5), wallMat);
+        nWall.position.z = -d/2;
+        gGroup.add(nWall);
+        
+        const sWall = new THREE.Mesh(new THREE.BoxGeometry(w, glassH, 0.5), wallMat);
+        sWall.position.z = d/2;
+        gGroup.add(sWall);
+        
+        // 5. Roof
+        const roofGroup = new THREE.Group();
+        roofGroup.position.y = roofY;
+        this.group.add(roofGroup);
+        
+        createBox(w + 2, 2, d + 2, '#EEEEEE', 0, 1, 0, roofGroup);
+        const skylight = new THREE.Mesh(new THREE.BoxGeometry(20, 0.5, 30), wallMat);
+        skylight.position.y = 1;
+        roofGroup.add(skylight);
+    }
+
+    buildEscalators(yBot, yTop) {
+        const escGroup = new THREE.Group();
+        this.group.add(escGroup);
+        
+        const xOffset = 2.5; // Two escalators side by side
+        const zStart = 10;
+        const zEnd = -8;
+        const height = yTop - yBot;
+        const length = zStart - zEnd;
+        
+        // 1. Gear Chambers (Under Glass) at Bottom
+        this.createGearChamber(0, yBot - 1.5, zStart + 2);
+        // And Top
+        this.createGearChamber(0, yTop - 1.5, zEnd - 2);
+
+        // 2. Escalator Ramps
+        // Left (Up)
+        this.createEscalatorUnit(-xOffset, yBot, zStart, yTop, zEnd);
+        // Right (Down)
+        this.createEscalatorUnit(xOffset, yBot, zStart, yTop, zEnd);
+    }
+
+    createGearChamber(x, y, z) {
+        // Glass Cover
+        const glassSize = 6;
+        const glass = createBox(8, 0.2, 6, '#88CCFF', x, y + 1.5, z, this.group);
+        glass.material.transparent = true;
+        glass.material.opacity = 0.3;
+        
+        // Gears
+        const redStone = '#CC2222';
+        const gold = '#FFAA00';
+        
+        const g1 = this.createGear(x - 2, y, z - 1, 1.2, redStone);
+        const g2 = this.createGear(x + 2, y, z + 1, 1.2, redStone);
+        const g3 = this.createGear(x, y, z, 0.8, gold);
+        
+        // Shafts
+        createCylinder(0.2, 0.2, 4, 8, '#555', x - 2, y-2, z - 1, this.group);
+        createCylinder(0.2, 0.2, 4, 8, '#555', x + 2, y-2, z + 1, this.group);
+    }
+
+    createGear(x, y, z, radius, color) {
+       const g = new THREE.Group();
+       g.position.set(x, y, z);
+       this.group.add(g);
+       
+       createCylinder(radius, radius, 0.5, 16, color, 0, 0, 0, g);
+       // Teeth
+       for(let i=0; i<8; i++) {
+           const ang = (i/8)*Math.PI*2;
+           const tx = Math.cos(ang) * (radius + 0.2);
+           const tz = Math.sin(ang) * (radius + 0.2);
+           createBox(0.4, 0.5, 0.4, color, tx, 0, tz, g).rotation.y = -ang;
+       }
+       this.gears.push(g);
+       return g;
+    }
+
+    createEscalatorUnit(x, yBot, zStart, yTop, zEnd) {
+        const slopeGroup = new THREE.Group();
+        slopeGroup.position.set(x, 0, 0);
+        this.group.add(slopeGroup);
+        
+        const length = zStart - zEnd;
+        const height = yTop - yBot;
+        const angle = Math.atan2(height, length);
+        const dist = Math.sqrt(length*length + height*height);
+        
+        // Balustrades (Glass + Silver)
+        const midY = (yTop + yBot) / 2;
+        const midZ = (zStart + zEnd) / 2;
+        
+        const balustrade = new THREE.Group();
+        balustrade.position.set(0, midY, midZ);
+        balustrade.rotation.x = angle; // Slope up towards negative Z (visual)
+        slopeGroup.add(balustrade);
+        
+        // Glass Sides
+        const glassMat = new THREE.MeshStandardMaterial({
+            color: '#AACCFF', transparent: true, opacity: 0.3
+        });
+        const gL = new THREE.Mesh(new THREE.BoxGeometry(0.2, 1.5, dist), glassMat);
+        gL.position.x = -1;
+        balustrade.add(gL);
+        const gR = new THREE.Mesh(new THREE.BoxGeometry(0.2, 1.5, dist), glassMat);
+        gR.position.x = 1;
+        balustrade.add(gR);
+        
+        // Handrails (Black)
+        createBox(0.3, 0.2, dist, '#111', -1, 0.85, 0, balustrade);
+        createBox(0.3, 0.2, dist, '#111', 1, 0.85, 0, balustrade);
+        
+        // Steps (Voxelated Grooves)
+        const numSteps = 30;
+        const stepDist = dist / numSteps;
+        
+        for(let i=0; i<numSteps; i++) {
+            const z = (i - numSteps/2) * stepDist;
+            const step = new THREE.Group();
+            step.position.set(0, -0.5, z);
+            balustrade.add(step);
+            
+            // Step Body (Silver)
+            createBox(1.8, 0.1, stepDist*1.1, '#AAAAAA', 0, 0, 0, step);
+            createBox(1.8, 0.2, 0.1, '#888888', 0, 0.1, stepDist/2, step); // Riser
+            
+            // Yellow Safety Lines
+            createBox(0.1, 0.11, stepDist, '#FFFF00', -0.85, 0, 0, step);
+            createBox(0.1, 0.11, stepDist, '#FFFF00', 0.85, 0, 0, step);
+        }
+    }
+
+    buildShops(y) {
+        const shopGroup = new THREE.Group();
+        shopGroup.position.set(0, y, 22); // Back Wall of Mezzanine
+        this.group.add(shopGroup);
+        
+        // Shop 1: Clothing
+        this.createStorefront(-10, 0, '#FFCCCC', 'CLOTHING', shopGroup);
+        
+        // Shop 2: Coffee
+        this.createStorefront(10, 0, '#6F4E37', 'COFFEE', shopGroup);
+    }
+    
+    createStorefront(x, y, color, type, parent) {
+        const g = new THREE.Group();
+        g.position.set(x, y, 0);
+        parent.add(g);
+        
+        // Facade
+        createBox(18, 6, 1, '#EEEEEE', 0, 3, 0, g);
+        createBox(16, 5, 0.5, '#222', 0, 2.5, 0.5, g); // Interior void
+        
+        // Sign
+        createBox(10, 1, 0.2, color, 0, 5, 0.8, g);
+        
+        if (type === 'CLOTHING') {
+            // Mannequins (Pixel Art Style)
+            for(let i=-1; i<=1; i+=2) {
+                const m = new THREE.Group();
+                m.position.set(i*3, 0, 1.5);
+                createBox(0.4, 1.5, 0.4, '#FFDDBB', 0, 0.75, 0, m); // Legs
+                createBox(0.6, 1.2, 0.4, '#FF5555', 0, 2.0, 0, m); // Torso
+                createBox(0.4, 0.4, 0.4, '#FFDDBB', 0, 2.8, 0, m); // Head
+                g.add(m);
+            }
+        } else if (type === 'COFFEE') {
+            // Counter
+            createBox(12, 1.2, 1, '#8B4513', 0, 0.6, 2, g);
+            // Espresso Machine
+            createBox(2, 1.5, 1, '#C0C0C0', -2, 1.8, 2, g);
+            // Cups
+            createBox(0.3, 0.4, 0.3, '#FFF', 0, 1.4, 2, g);
+            createBox(0.3, 0.4, 0.3, '#FFF', 1, 1.4, 2, g);
+        }
+    }
+    
+    buildVegetation(y) {
+        // Voxel Planter
+        const pGroup = new THREE.Group();
+        pGroup.position.set(-12, y, -10);
+        this.group.add(pGroup);
+        
+        createBox(6, 1, 6, '#8B4513', 0, 0.5, 0, pGroup); // Soil Box
+        createBox(5, 0.5, 5, '#228822', 0, 1.0, 0, pGroup); // Grass
+        
+        // Palm Tree
+        const trunkColor = '#5C4033';
+        const leafColor = '#32CD32';
+        createBox(0.6, 5, 0.6, trunkColor, 0, 3, 0, pGroup);
+        
+        // Leaves
+        const lY = 5.5;
+        createBox(4, 0.2, 0.6, leafColor, 0, lY, 0, pGroup);
+        createBox(0.6, 0.2, 4, leafColor, 0, lY, 0, pGroup);
+        createBox(3, 0.2, 0.6, leafColor, 0, lY+0.2, 0, pGroup).rotation.y = Math.PI/4;
+        createBox(0.6, 0.2, 3, leafColor, 0, lY+0.2, 0, pGroup).rotation.y = Math.PI/4;
+        
+        // Second Planter
+        const p2 = pGroup.clone();
+        p2.position.set(12, y, -10);
+        this.group.add(p2);
+    }
+}
+
 // --- MAIN ENVIRONMENT ---
 export function createEnvironment(scene, audioGenerator) {
   const env = new THREE.Group();
@@ -2393,57 +2707,11 @@ export function createEnvironment(scene, audioGenerator) {
   createTunnelPortal(95, false, env, 60);
   createTunnelPortal(-215, true, env, 60);
 
-  const wl = new THREE.Group();
-  wl.position.set(10, 0, 50);
+  // --- WESTLAKE MALL ---
+  const westlake = new WestlakeMall(env, 10, 50, audioGenerator);
+  animatedObjects.push(westlake);
 
-  const beigeStone = '#D8C8B8';
-  
-  createBox(15, 60, 40, beigeStone, -22, 30, 20, wl);
-  createBox(15, 60, 40, beigeStone, 22, 30, 20, wl);
-  createBox(30, 20, 40, beigeStone, 0, 50, 20, wl);
-  createBox(30, 60, 2, '#222', 0, 30, 38, wl);
-  createBox(10, 1, 40, COLORS.CONCRETE, -8, 11, 20, wl); 
-  createBox(10, 1, 40, COLORS.CONCRETE, 8, 11, 20, wl); 
-  createBox(2, 40, 2, beigeStone, -14, 20, 5, wl);
-  createBox(2, 40, 2, beigeStone, 14, 20, 5, wl);
-  createBox(28, 4, 1, '#004488', 0, 45, 1, wl); 
-  createBox(26, 0.5, 1.2, '#FFFFFF', 0, 45, 1, wl); 
-
-  const glassMat = new THREE.MeshStandardMaterial({ 
-      color: '#88CCFF', transparent: true, opacity: 0.6, roughness: 0.1 
-  });
-  const gLeft = new THREE.Mesh(new THREE.BoxGeometry(10, 40, 1), glassMat);
-  gLeft.position.set(-22, 35, 0.5);
-  wl.add(gLeft);
-  const gRight = new THREE.Mesh(new THREE.BoxGeometry(10, 40, 1), glassMat);
-  gRight.position.set(22, 35, 0.5);
-  wl.add(gRight);
-
-  createTicketMachine(12, 11, 10, -Math.PI/2, wl);
-  createTicketMachine(-12, 11, 10, Math.PI/2, wl);
-  createBench(6, 11, 20, -Math.PI/2, wl);
-  createBench(-6, 11, 20, Math.PI/2, wl);
-
-  const bufferG = new THREE.Group();
-  bufferG.position.set(0, TRACK_HEIGHT, 30); 
-  const bMat = new THREE.MeshStandardMaterial({color: '#E31837', emissive: '#550000'});
-  const bGeo = new THREE.BoxGeometry(1.5, 1, 1);
-  const bufL = new THREE.Mesh(bGeo, bMat); bufL.position.set(-2.5, 0.5, 0); bufferG.add(bufL);
-  const bufR = new THREE.Mesh(bGeo, bMat); bufR.position.set(2.5, 0.5, 0); bufferG.add(bufR);
-  wl.add(bufferG);
-
-  const gRoof = createBox(30, 0.5, 25, COLORS.GLASS, 0, 25, -10, wl);
-  gRoof.material.transparent = true; gRoof.material.opacity = 0.5; gRoof.rotation.x = 0.2;
-  for(let i=0; i<6; i++) {
-      const bm = createBox(30.5, 0.8, 0.5, COLORS.STEEL, 0, 25, -20 + (i*4), wl);
-      bm.rotation.x = 0.2;
-  }
-  for(let i=0; i<5; i++) {
-      const bm = createBox(0.5, 0.8, 25, COLORS.STEEL, -12 + (i*6), 25, -10, wl);
-      bm.rotation.x = 0.2;
-  }
-  env.add(wl);
-
+  // --- SEATTLE CENTER ---
   const seattleCenter = new THREE.Group();
   seattleCenter.position.set(-155, 0, -280);
   createBox(50, 2, 16, '#EEEEEE', 0, TRACK_HEIGHT - 1, 0, seattleCenter); 
