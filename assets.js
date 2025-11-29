@@ -864,7 +864,7 @@ export const createFifthAvePavement = (scene) => {
              isRamp = true;
              const rampLen = 60;
              const dist = z - 80;
-             const t = Math.min(1, dist / rampLen); // Fixed syntax error here
+             const t = Math.min(1, dist / rampLen); 
              ySurface = -12 * t;
         }
 
@@ -2378,16 +2378,16 @@ class WestlakeMall {
         const pillarW = 2.5;
         const roofY = y4 + 16; 
 
-        // 1. Columns (Extended to Roof)
+        // 1. Columns (Extended to Ground)
         const colsX = [ -19, -10, 10, 19 ];
         const colsZ = [ -22, 0, 22 ];
         
         colsX.forEach(cx => {
             colsZ.forEach(cz => {
                 if (Math.abs(cx) < 8) return; 
-                // Pillar from y3 to roof
-                const h = roofY - y3;
-                createBox(pillarW, h, pillarW, pillarColor, cx, y3 + h/2, cz, this.group);
+                // Pillar from ground (0) to roof
+                // Replaced 'y3' (Level 3) with 0 as the starting Y, and adjusted height.
+                createBox(pillarW, roofY, pillarW, pillarColor, cx, roofY / 2, cz, this.group);
             });
         });
         
