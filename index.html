@@ -7,16 +7,14 @@
     <title>Seattle Voxel Monorail</title>
     <style>
       :root {
-        --dock-bg: rgba(255, 255, 255, 0.35);
-        --dock-border: rgba(255, 255, 255, 0.4);
-        --btn-bg: rgba(255, 255, 255, 0.5);
-        --btn-hover: rgba(255, 255, 255, 0.85);
-        --btn-active: #1f2937;
-        --text-main: #1f2937;
+        --dock-bg: rgba(255, 255, 255, 0.45);
+        --dock-border: rgba(255, 255, 255, 0.5);
+        --btn-bg: rgba(255, 255, 255, 0.6);
+        --btn-hover: rgba(255, 255, 255, 0.9);
+        --btn-active: #111827;
+        --text-main: #111827;
         --text-active: #ffffff;
-        --blur-amt: 24px;
-        --radius-dock: 24px;
-        --radius-btn: 16px;
+        --blur-amt: 32px;
       }
 
       html, body { 
@@ -59,27 +57,28 @@
 
       /* --- HEADER --- */
       .app-header {
-        padding: 2.5rem 3rem;
-        text-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        /* Fluid padding: Minimum 2rem, scales with view width */
+        padding: clamp(2rem, 3vw, 5rem);
+        text-shadow: 0 4px 12px rgba(0,0,0,0.15);
       }
 
       .app-title {
-        font-size: 4rem; /* Large on desktop */
+        /* Fluid font size: Huge on desktop, reasonable on mobile */
+        font-size: clamp(3rem, 6vw, 7rem);
         font-weight: 800;
         color: #1f2937;
         margin: 0;
         line-height: 0.9;
         letter-spacing: -0.04em;
-        opacity: 0.9;
       }
 
       .app-subtitle {
-        font-size: 1.5rem;
+        font-size: clamp(1rem, 1.5vw, 2rem);
         font-weight: 600;
         color: #4b5563;
         margin-top: 0.5rem;
         letter-spacing: 0.02em;
-        opacity: 0.8;
+        opacity: 0.9;
       }
 
       /* --- BOTTOM DOCK --- */
@@ -87,131 +86,153 @@
         display: flex;
         justify-content: center;
         align-items: flex-end;
-        padding-bottom: 2.5rem;
+        /* Padding bottom scales so it doesn't look stuck to edge on big screens */
+        padding-bottom: clamp(2rem, 4vw, 5rem);
         width: 100%;
-        pointer-events: none; /* Let clicks pass through around the dock */
+        pointer-events: none;
       }
 
       .glass-dock {
         pointer-events: auto;
         display: flex;
         align-items: center;
-        gap: 0.75rem;
-        padding: 1rem 1.25rem;
+        justify-content: center;
+        /* Fluid gap and padding */
+        gap: clamp(8px, 0.8vw, 24px);
+        padding: clamp(12px, 1vw, 24px);
+        
         background: var(--dock-bg);
         border: 1px solid var(--dock-border);
         backdrop-filter: blur(var(--blur-amt));
         -webkit-backdrop-filter: blur(var(--blur-amt));
-        border-radius: var(--radius-dock);
-        box-shadow: 0 8px 32px rgba(0, 0, 0, 0.12);
-        max-width: 90%;
+        border-radius: clamp(20px, 2vw, 48px);
+        box-shadow: 0 8px 32px rgba(0, 0, 0, 0.15);
+        
+        /* Ensure it fits on smaller screens but doesn't stretch too wide */
+        width: auto;
+        max-width: 95%;
         overflow-x: auto;
-        scrollbar-width: none; /* Hide scrollbar Firefox */
-        -ms-overflow-style: none;  /* Hide scrollbar IE */
+        scrollbar-width: none;
       }
       .glass-dock::-webkit-scrollbar { display: none; }
 
       /* --- BUTTONS --- */
       .dock-btn {
+        appearance: none;
+        border: none;
         background: var(--btn-bg);
-        border: 1px solid rgba(255,255,255,0.2);
         color: var(--text-main);
-        font-size: 1.125rem; /* ~18px */
+        
+        /* FLUID SIZING MAGIC: 
+           Min: 16px (Mobile)
+           Target: 1.2% of Screen Width (Desktop)
+           Max: 32px (Huge 4K Screens) 
+        */
+        font-size: clamp(16px, 1.2vw, 32px);
+        
+        /* EM units allow padding to scale with the fluid font-size */
+        padding: 0.7em 1.2em;
+        border-radius: 0.8em;
+        
         font-weight: 700;
-        padding: 0.85rem 1.5rem;
-        border-radius: var(--radius-btn);
         cursor: pointer;
-        transition: all 0.2s cubic-bezier(0.2, 0.8, 0.2, 1);
+        transition: transform 0.15s ease, background 0.2s ease, box-shadow 0.2s ease;
         white-space: nowrap;
         display: flex;
         align-items: center;
         justify-content: center;
-        gap: 0.5rem;
-        min-height: 3.5rem;
+        gap: 0.4em;
+        
+        box-shadow: 0 2px 8px rgba(0,0,0,0.05);
       }
 
       .dock-btn:hover {
         background: var(--btn-hover);
-        transform: translateY(-2px);
-        box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+        transform: translateY(-3px);
+        box-shadow: 0 6px 12px rgba(0,0,0,0.15);
+        z-index: 1;
       }
 
       .dock-btn:active {
-        transform: scale(0.96);
+        transform: scale(0.95);
       }
 
       .dock-btn.active {
         background: var(--btn-active);
         color: var(--text-active);
-        box-shadow: 0 4px 15px rgba(0,0,0,0.2);
+        box-shadow: 0 4px 16px rgba(0,0,0,0.25);
       }
 
       /* Icon Buttons (Zoom/Sound) */
       .icon-btn {
         padding: 0;
-        width: 3.5rem;
-        min-width: 3.5rem;
-        font-size: 1.5rem;
+        /* Square aspect ratio based on font size */
+        width: 3em; 
+        height: 3em;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: clamp(18px, 1.4vw, 36px); /* Slightly larger icons */
       }
 
       /* Divider */
       .dock-divider {
         width: 2px;
-        height: 2rem;
-        background: rgba(0,0,0,0.1);
-        margin: 0 0.5rem;
+        height: 2em;
+        background: rgba(0,0,0,0.15);
+        margin: 0 0.2em;
         border-radius: 2px;
       }
 
       /* --- AUDIO HINT --- */
       #audio-hint {
         position: absolute;
-        bottom: 8rem; /* Above the dock */
+        bottom: clamp(7rem, 12vw, 15rem); /* Positioned relative to dock height */
         left: 50%;
         transform: translateX(-50%);
-        background-color: rgba(31, 41, 55, 0.9);
+        background-color: rgba(17, 24, 39, 0.95);
         color: white;
-        padding: 0.75rem 1.5rem;
-        border-radius: 2rem;
-        font-size: 1rem;
+        padding: 0.8em 1.5em;
+        border-radius: 2em;
+        font-size: clamp(14px, 1vw, 24px);
         font-weight: 600;
         pointer-events: none;
         transition: opacity 0.5s ease;
         opacity: 1;
-        box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+        box-shadow: 0 4px 16px rgba(0,0,0,0.3);
         z-index: 20;
+        white-space: nowrap;
       }
 
-      /* --- RESPONSIVENESS --- */
-      @media (max-width: 1024px) {
-        .app-title { font-size: 3rem; }
-        .dock-btn { font-size: 1rem; padding: 0.75rem 1.25rem; }
-      }
-
-      @media (max-width: 768px) {
-        .app-header { padding: 1.5rem; }
-        .app-title { font-size: 2.25rem; }
-        .app-subtitle { font-size: 1.1rem; }
+      /* --- MOBILE OVERRIDES --- */
+      @media (max-width: 600px) {
+        .dock-container {
+          padding-bottom: 1rem;
+          justify-content: flex-start; /* Align left for horizontal scroll */
+          overflow-x: auto;
+        }
         
-        .dock-container { padding-bottom: 1.5rem; }
-        
-        /* Make scrollable dock */
         .glass-dock {
+          width: max-content; /* Allow growing beyond screen */
+          margin: 0 1rem;
           justify-content: flex-start;
           padding: 0.75rem;
-          gap: 0.5rem;
-          margin: 0 1rem;
-          width: auto;
+        }
+
+        .dock-btn {
+          /* Lock size on mobile so it doesn't get too small */
+          font-size: 15px; 
+          padding: 0.8rem 1rem;
         }
         
-        .dock-btn {
-          font-size: 0.9rem;
-          padding: 0.75rem 1rem;
-          min-height: 3rem;
-        }
         .icon-btn {
+          font-size: 18px;
           width: 3rem;
-          min-width: 3rem;
+          height: 3rem;
+        }
+        
+        .app-title {
+          font-size: 2.5rem;
         }
       }
     </style>
