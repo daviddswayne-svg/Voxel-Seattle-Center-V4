@@ -1,4 +1,5 @@
 
+
 import * as THREE from 'three';
 
 class SoundGenerator {
@@ -14,6 +15,8 @@ class SoundGenerator {
     this.buffers['TRAIN'] = this.createTrainBuffer();
     this.buffers['ELEVATOR'] = this.createElevatorBuffer();
     this.buffers['MOPOP'] = this.createMoPopBuffer();
+    this.buffers['HELICOPTER'] = this.createHelicopterBuffer();
+    this.buffers['RADIO'] = this.createRadioBuffer();
   }
 
   createBuffer(duration, renderCallback) {
@@ -141,6 +144,50 @@ class SoundGenerator {
         }
 
         data[i] = (kick * 0.8) + (snare * 0.5) + (hat * 0.3) + synth;
+      }
+    });
+  }
+
+  createHelicopterBuffer() {
+    // 0.4s Loop for Fast Rotor
+    return this.createBuffer(0.4, (data, rate) => {
+      for (let i = 0; i < data.length; i++) {
+        const t = i / rate;
+        // White noise base
+        const white = Math.random() * 2 - 1;
+        // Amplitude Modulation for the "Chop"
+        // 12 Hz chop frequency
+        const chop = (Math.sin(2 * Math.PI * 12 * t) > 0.0) ? 1.0 : 0.3;
+        // Add a low sine for the engine drone
+        const drone = Math.sin(2 * Math.PI * 100 * t) * 0.1;
+        
+        data[i] = (white * 0.4 * chop) + drone;
+      }
+    });
+  }
+
+  createRadioBuffer() {
+    // 12s Loop for Chatter
+    return this.createBuffer(12.0, (data, rate) => {
+      for (let i = 0; i < data.length; i++) {
+        const t = i / rate;
+        data[i] = 0;
+        
+        // Create 2 bursts of chatter
+        const isBurst1 = t > 2.0 && t < 4.5;
+        const isBurst2 = t > 8.0 && t < 9.5;
+        
+        if (isBurst1 || isBurst2) {
+            // Static
+            const staticNoise = (Math.random() * 2 - 1) * 0.1;
+            // "Voice" - Amplitude modulated noise with varying frequencies to sound like garbled speech
+            const mod1 = Math.sin(t * 20); // Syllable-ish rate
+            const mod2 = Math.sin(t * 300); // Tonal
+            const voice = staticNoise * mod1 * mod2 * 4.0;
+            
+            // Bandpass filter approximation (just dampen it)
+            data[i] = (voice + staticNoise) * 0.2;
+        }
       }
     });
   }
