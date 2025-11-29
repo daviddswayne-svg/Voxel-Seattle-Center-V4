@@ -1,5 +1,4 @@
 
-
 // ... existing imports ...
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
@@ -105,8 +104,12 @@ const toggleAudio = () => {
 const updateSoundIcon = () => {
     if (iconSound) iconSound.textContent = audioEnabled ? '🔊' : '🔇';
     if (btnSound) {
-        btnSound.style.backgroundColor = audioEnabled ? '#1f2937' : 'white';
-        btnSound.style.color = audioEnabled ? 'white' : '#1f2937';
+        // Toggle Active Class
+        if (audioEnabled) {
+            btnSound.classList.add('active');
+        } else {
+            btnSound.classList.remove('active');
+        }
     }
 };
 
@@ -258,16 +261,25 @@ function setMode(mode) {
         heliObj.isManual = (mode === 'HELI');
     }
     
-    document.getElementById('btn-orbit').className = mode === 'ORBIT' ? 'btn btn-active-orbit' : 'btn btn-default';
-    document.getElementById('btn-red').className = mode === 'RED' ? 'btn btn-active-red' : 'btn btn-default';
-    document.getElementById('btn-blue').className = mode === 'BLUE' ? 'btn btn-active-blue' : 'btn btn-default';
-    document.getElementById('btn-elevator').className = mode === 'ELEVATOR' ? 'btn btn-active-elevator' : 'btn btn-default';
-    document.getElementById('btn-taxi').className = mode === 'TAXI' ? 'btn btn-active-taxi' : 'btn btn-default';
-    
-    const btnHeliGamepad = document.getElementById('btn-heli-gamepad');
-    if (btnHeliGamepad) {
-        btnHeliGamepad.className = mode === 'HELI' ? 'btn btn-active-heli' : 'btn btn-default';
-    }
+    // Update Active States using classList
+    const buttons = {
+        'ORBIT': document.getElementById('btn-orbit'),
+        'RED': document.getElementById('btn-red'),
+        'BLUE': document.getElementById('btn-blue'),
+        'ELEVATOR': document.getElementById('btn-elevator'),
+        'TAXI': document.getElementById('btn-taxi'),
+        'HELI': document.getElementById('btn-heli-gamepad')
+    };
+
+    Object.keys(buttons).forEach(key => {
+        const btn = buttons[key];
+        if (!btn) return;
+        if (key === mode) {
+            btn.classList.add('active');
+        } else {
+            btn.classList.remove('active');
+        }
+    });
 }
 
 const btnOrbit = document.getElementById('btn-orbit');
