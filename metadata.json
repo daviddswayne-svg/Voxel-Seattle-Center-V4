@@ -1,0 +1,5 @@
+{
+  "name": "Seattle Voxel Monorail v2",
+  "description": "A high-fidelity voxel simulation of the Seattle Center Monorail using Three.js and React.",
+  "requestFramePermissions": []
+}
