@@ -95,6 +95,42 @@ export function createTrack(curve, scene) {
       }
   }
 
+  // --- ADD BUMPERS ---
+  const bumperGeo = new THREE.BoxGeometry(2.4, 1.5, 1.0); 
+  const bumperMat = new THREE.MeshStandardMaterial({ color: '#CC0000', roughness: 0.3 });
+
+  // Start Bumper (T=0)
+  const p0 = curve.getPointAt(0);
+  const t0 = curve.getTangentAt(0);
+  if(p0 && t0) {
+      const b0 = new THREE.Mesh(bumperGeo, bumperMat);
+      b0.position.copy(p0);
+      b0.position.y += 1.0; // Sit on top of beam
+      b0.lookAt(p0.clone().add(t0));
+      group.add(b0);
+      
+      // Warning Light
+      const light = createBox(0.2, 0.2, 0.2, '#FF0000', 0, 1.0, 0.55, b0);
+      light.material.emissive = new THREE.Color('#FF0000');
+      light.material.emissiveIntensity = 2;
+  }
+
+  // End Bumper (T=1)
+  const p1 = curve.getPointAt(1);
+  const t1 = curve.getTangentAt(1);
+  if(p1 && t1) {
+      const b1 = new THREE.Mesh(bumperGeo, bumperMat);
+      b1.position.copy(p1);
+      b1.position.y += 1.0;
+      b1.lookAt(p1.clone().add(t1));
+      group.add(b1);
+      
+      // Warning Light
+      const light = createBox(0.2, 0.2, 0.2, '#FF0000', 0, 1.0, -0.55, b1);
+      light.material.emissive = new THREE.Color('#FF0000');
+      light.material.emissiveIntensity = 2;
+  }
+
   scene.add(group);
 }
 
