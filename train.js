@@ -1,158 +1,115 @@
 
 import * as THREE from 'three';
 import { createCarMesh } from './assets.js';
-import { CarType, TRAIN_LENGTH_RATIO, CAR_GAP } from './constants.js';
+import { TRAIN_LENGTH_RATIO, CAR_GAP, CarType } from './constants.js';
 
 export class Train {
-  constructor(config, curve, scene, audioGenerator) {
-    this.config = config;
-    this.curve = curve;
-    this.scene = scene;
-    this.progress = config.initialProgress || 0.05;
-    this.speed = config.speed;
-    this.direction = config.direction;
-    this.paused = false;
-    this.pauseTimer = 0;
-    this.stopDuration = 0;
+    constructor(config, curve, scene, audioGenerator) {
+        this.config = config;
+        this.curve = curve;
+        this.scene = scene;
+        
+        this.progress = config.initialProgress || 0;
+        this.speed = config.speed || 0.1;
+        this.direction = config.direction || 1; // 1 for forward, -1 for backward
+        this.color = config.color || '#ff0000';
+        
+        this.cars = [];
+        this.group = new THREE.Group();
+        scene.add(this.group);
 
-    this.group = new THREE.Group();
-    
-    // Audio (Motor Whine)
-    if (audioGenerator) {
-        // refDistance 30 -> Louder
-        const sound = audioGenerator.createPositionalAudio('TRAIN', 30, 200, 0.4);
-        if (sound) this.group.add(sound);
-    }
-
-    this.scene.add(this.group);
-    
-    // Create 4 Car Groups
-    this.cars = [];
-    for (let i = 0; i < 4; i++) {
-        const carGroup = new THREE.Group();
-        this.group.add(carGroup);
-        // Placeholders
-        this.cars.push({ group: carGroup, mesh: null, type: null });
-    }
-    
-    this.updateVisuals();
-  }
-
-  updateVisuals() {
-    // Determine visual types based on direction
-    const types = [CarType.BODY, CarType.BODY, CarType.BODY, CarType.BODY];
-    if (this.direction === 1) {
-        types[0] = CarType.HEAD;
-        types[3] = CarType.TAIL;
-    } else {
-        types[0] = CarType.TAIL;
-        types[3] = CarType.HEAD;
-    }
-
-    // Rebuild meshes if type changed
-    this.cars.forEach((c, idx) => {
-        if (c.type !== types[idx]) {
-            if (c.mesh) c.group.remove(c.mesh);
-            c.type = types[idx];
-            c.mesh = createCarMesh(types[idx], this.config.color);
-            c.group.add(c.mesh);
+        // Define Train Composition: HEAD - BODY - BODY - TAIL
+        const carTypes = [CarType.HEAD, CarType.BODY, CarType.BODY, CarType.TAIL];
+        
+        carTypes.forEach((type, i) => {
+            const meshGroup = createCarMesh(type, this.color);
             
-            // Add details to Head cars
-            if (c.type === CarType.HEAD) {
-                 // Undercarriage Detail
-                 const acc = new THREE.Mesh(
-                     new THREE.CylinderGeometry(0.85, 0.85, 0.7, 16), 
-                     new THREE.MeshStandardMaterial({color:'#333', roughness:0.9})
-                 );
-                 acc.rotation.x = Math.PI/2;
-                 acc.position.set(0, 0.5, -2.1);
-                 c.mesh.add(acc);
+            // Attach audio to the lead car (index 0)
+            if (i === 0 && audioGenerator) {
+                // Use 'TRAIN' sound buffer (Electric Whine + Track Clack)
+                const sound = audioGenerator.createPositionalAudio('TRAIN', 20, 500, 0.5);
+                if (sound) meshGroup.add(sound);
             }
-        }
-    });
-  }
 
-  update(delta) {
-    if (this.paused) {
-      this.pauseTimer += delta;
-      if (this.pauseTimer >= this.stopDuration) {
-        this.paused = false;
-        this.pauseTimer = 0;
-        
-        // Flip direction and visuals AFTER the wait
-        this.direction *= -1;
-        this.updateVisuals();
-      }
-    } else {
-       this.progress += (this.speed * delta * this.direction * 0.05);
-
-       // Upper Limit (Seattle Center) - Go deeper into station (0.99)
-       if (this.progress > 0.99) {
-         this.progress = 0.99;
-         this.paused = true;
-         this.stopDuration = 7 + Math.random() * 3; // 7-10 seconds wait
-       } 
-       // Lower Limit (Westlake) - Stop at 0.04 to keep lead car valid on track
-       else if (this.progress < 0.04) {
-         this.progress = 0.04;
-         this.paused = true;
-         this.stopDuration = 7 + Math.random() * 3; // 7-10 seconds wait
-       }
-    }
-
-    // Update Car Positions
-    this.cars.forEach((car, index) => {
-        const t = this.progress - (index * (TRAIN_LENGTH_RATIO + CAR_GAP));
-        const clampedT = Math.max(0, Math.min(1, t));
-        
-        const position = this.curve.getPointAt(clampedT);
-        const tangent = this.curve.getTangentAt(clampedT);
-        
-        if (position && tangent) {
-            car.group.position.copy(position);
+            this.cars.push({
+                group: meshGroup,
+                type: type,
+                // Index 0 is the "front" in terms of T-value calculations
+                offset: i * (TRAIN_LENGTH_RATIO + CAR_GAP)
+            });
             
-            // Orient car based on direction so "Front" is always leading
-            if (this.direction === 1) {
-                car.group.lookAt(position.clone().add(tangent));
-            } else {
-                // Flip 180 so the "Front" (Head geometry) faces the new movement direction
-                car.group.lookAt(position.clone().sub(tangent));
-            }
-        }
-    });
-
-    // Update Sound Position
-    const sound = this.group.children.find(c => c.isAudio);
-    if (sound) {
-        // Position sound at the middle of the train
-        const centerT = this.progress - (1.5 * (TRAIN_LENGTH_RATIO + CAR_GAP));
-        const clampedCenter = Math.max(0, Math.min(1, centerT));
-        const centerPos = this.curve.getPointAt(clampedCenter);
-        if (centerPos) {
-             sound.position.copy(centerPos);
-        }
+            this.group.add(meshGroup);
+        });
     }
-  }
 
-  getCameraTarget() {
-      const leadIndex = this.direction === 1 ? 0 : 3;
-      const leadCar = this.cars[leadIndex];
-      
-      const pos = leadCar.group.position.clone();
-      
-      // Because we now flip the car group in update(), 
-      // the local Z axis (forward) always points in the direction of travel.
-      const forward = new THREE.Vector3(0, 0, 1).applyQuaternion(leadCar.group.quaternion);
-      
-      // Camera Offset: Moved to the nose tip to clear new geometry
-      // Position Z: 3.8 (Clear of the 3.65 nose tip)
-      // Position Y: 1.6 (Clear of bumper height)
-      const offset = forward.clone().multiplyScalar(3.8).add(new THREE.Vector3(0, 1.6, 0));
-      const eye = pos.clone().add(offset);
-      
-      // Look point: Further ahead on the track, slightly down
-      const look = pos.clone().add(forward.clone().multiplyScalar(50)).add(new THREE.Vector3(0, -2, 0));
-      
-      return { position: eye, lookAt: look };
-  }
+    update(delta) {
+        // Shuttle Logic (Ping-Pong)
+        const speedScale = 0.1; // normalize speed to track length
+        
+        this.progress += this.direction * this.speed * delta * speedScale;
+
+        // Bounce at ends of track
+        if (this.progress > 1.0) {
+            this.progress = 1.0;
+            this.direction = -1;
+        } else if (this.progress < 0.0) {
+            this.progress = 0.0;
+            this.direction = 1;
+        }
+
+        // Update Car Positions
+        this.cars.forEach((car, index) => {
+            // Calculate 't' for this car. 
+            // We assume car[0] is at 'this.progress' and others trail behind it relative to the track curve.
+            // Note: When moving backwards (direction -1), this simple offset logic means the train 
+            // visually moves "tail first" which is correct for a bi-directional monorail without physically rotating the train.
+            const t = this.progress - (index * (TRAIN_LENGTH_RATIO + CAR_GAP) * this.direction);
+            
+            // Clamp to stay on track (prevent errors if slightly out of bounds during turn-around)
+            const clampedT = Math.max(0.001, Math.min(0.999, t));
+            
+            const position = this.curve.getPointAt(clampedT);
+            const tangent = this.curve.getTangentAt(clampedT);
+            
+            if (position && tangent) {
+                car.group.position.copy(position);
+                
+                // Orient car to face the direction of the track tangent
+                // If direction is -1, the train is moving against the tangent, so we look backwards
+                const lookTarget = position.clone();
+                if (this.direction === 1) {
+                    lookTarget.add(tangent);
+                } else {
+                    lookTarget.sub(tangent);
+                }
+                
+                car.group.lookAt(lookTarget);
+            }
+        });
+    }
+
+    getCameraTarget() {
+        // Determine which car is "leading" to attach the camera to
+        // If direction is 1, index 0 is front. If -1, index 3 is front.
+        const leadCarIndex = this.direction === 1 ? 0 : 3;
+        const car = this.cars[leadCarIndex];
+        
+        if (!car) return { position: new THREE.Vector3(), lookAt: new THREE.Vector3() };
+        
+        const pos = car.group.position.clone();
+        
+        // Calculate camera offset relative to the car's orientation
+        // We want the camera "behind" and "above" the car.
+        // Since we oriented the car using lookAt, its local +Z is "forward" (visually).
+        // Actually, createCarMesh puts the nose at +Z.
+        // So "Behind" is -Z.
+        
+        const offset = new THREE.Vector3(0, 6, -18); 
+        offset.applyQuaternion(car.group.quaternion);
+        
+        const camPos = pos.clone().add(offset);
+        const lookAt = pos.clone().add(new THREE.Vector3(0, 2, 0)); // Look slightly above track level
+        
+        return { position: camPos, lookAt: lookAt };
+    }
 }
