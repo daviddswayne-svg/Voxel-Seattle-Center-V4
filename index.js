@@ -1,4 +1,6 @@
 
+
+// ... existing imports ...
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
@@ -7,7 +9,7 @@ import { createTrack, createEnvironment, animatedObjects, clearAnimatedObjects }
 import { Train } from './train.js';
 import { setupAudio } from './audio.js';
 
-// --- SETUP ---
+// ... existing setup code ...
 const root = document.getElementById('root');
 
 // CLEANUP
@@ -250,12 +252,22 @@ function setMode(mode) {
         controls.enabled = false;
     }
     
+    // Handle Heli Manual Control State
+    const heliObj = animatedObjects.find(obj => obj.constructor.name === 'NewsHelicopter');
+    if (heliObj) {
+        heliObj.isManual = (mode === 'HELI');
+    }
+    
     document.getElementById('btn-orbit').className = mode === 'ORBIT' ? 'btn btn-active-orbit' : 'btn btn-default';
     document.getElementById('btn-red').className = mode === 'RED' ? 'btn btn-active-red' : 'btn btn-default';
     document.getElementById('btn-blue').className = mode === 'BLUE' ? 'btn btn-active-blue' : 'btn btn-default';
     document.getElementById('btn-elevator').className = mode === 'ELEVATOR' ? 'btn btn-active-elevator' : 'btn btn-default';
     document.getElementById('btn-taxi').className = mode === 'TAXI' ? 'btn btn-active-taxi' : 'btn btn-default';
-    document.getElementById('btn-heli').className = mode === 'HELI' ? 'btn btn-active-heli' : 'btn btn-default';
+    
+    const btnHeliGamepad = document.getElementById('btn-heli-gamepad');
+    if (btnHeliGamepad) {
+        btnHeliGamepad.className = mode === 'HELI' ? 'btn btn-active-heli' : 'btn btn-default';
+    }
 }
 
 const btnOrbit = document.getElementById('btn-orbit');
@@ -263,14 +275,14 @@ const btnRed = document.getElementById('btn-red');
 const btnBlue = document.getElementById('btn-blue');
 const btnElevator = document.getElementById('btn-elevator');
 const btnTaxi = document.getElementById('btn-taxi');
-const btnHeli = document.getElementById('btn-heli');
+const btnHeliGamepad = document.getElementById('btn-heli-gamepad');
 
 if (btnOrbit) btnOrbit.addEventListener('click', () => setMode('ORBIT'));
 if (btnRed) btnRed.addEventListener('click', () => setMode('RED'));
 if (btnBlue) btnBlue.addEventListener('click', () => setMode('BLUE'));
 if (btnElevator) btnElevator.addEventListener('click', () => setMode('ELEVATOR'));
 if (btnTaxi) btnTaxi.addEventListener('click', () => setMode('TAXI'));
-if (btnHeli) btnHeli.addEventListener('click', () => setMode('HELI'));
+if (btnHeliGamepad) btnHeliGamepad.addEventListener('click', () => setMode('HELI'));
 
 // --- ZOOM CONTROLS ---
 const btnZoomIn = document.getElementById('btn-zoom-in');

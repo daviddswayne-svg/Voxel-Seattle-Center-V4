@@ -1,4 +1,5 @@
 
+
 import * as THREE from 'three';
 import { COLORS, TRACK_HEIGHT, PIER_SPACING, CarType, TRACK_LEFT, TRACK_RIGHT, TAXI_PATH } from './constants.js';
 import { createBox, createCylinder, createPlane } from './utils.js';
@@ -156,22 +157,24 @@ class NewsHelicopter {
         this.group = new THREE.Group();
         this.landingPos = landingPadPos ? landingPadPos.clone() : new THREE.Vector3(0,0,0);
         this.group.position.copy(this.landingPos);
-        
-        // Needle/Orbit Center Position
-        this.needlePos = new THREE.Vector3(-195, 230, -195); 
-        this.orbitRadius = 70;
 
-        this.state = 'PARKED'; 
-        this.timer = 0;
-        this.scanTime = 0; 
-
+        // Manual Physics State
+        this.isManual = false;
+        this.velocity = new THREE.Vector3();
+        this.angularVelocity = 0;
         this.rotorSpeed = 0;
         this.targetRotorSpeed = 0;
-        
-        this.orbitAngle = 0;
-        this.flightCurve = null;
-        this.flightProgress = 0;
-        this.flightDuration = 0;
+
+        // Physics Constants
+        this.PHYSICS = {
+            ACCEL: 60.0,
+            LIFT: 40.0,
+            GRAVITY: 20.0,
+            FRICTION: 0.97,
+            ANGULAR_ACCEL: 2.0,
+            ANGULAR_FRICTION: 0.92,
+            MAX_TILT: 0.4 // Max banking in radians
+        };
 
         if (audioGenerator) {
             // Using 'ELEVATOR' buffer as a proxy for heavy machinery/rotor noise
@@ -248,24 +251,91 @@ class NewsHelicopter {
         scene.add(this.group);
     }
 
-    generateCurve(start, end, heightBoost, lateralOffset) {
-        if (!start || !end) return new THREE.QuadraticBezierCurve3(new THREE.Vector3(), new THREE.Vector3(), new THREE.Vector3());
+    updateHelicopterControls(delta) {
+        const gamepads = navigator.getGamepads ? navigator.getGamepads() : [];
+        // Loop through to find first active gamepad
+        let gp = null;
+        for (let i = 0; i < 4; i++) {
+            if (gamepads[i] && gamepads[i].connected) {
+                gp = gamepads[i];
+                break;
+            }
+        }
+
+        if (gp) {
+            // Input Handling (Standard mapping)
+            const leftStickX = Math.abs(gp.axes[0]) > 0.15 ? gp.axes[0] : 0;
+            const leftStickY = Math.abs(gp.axes[1]) > 0.15 ? gp.axes[1] : 0;
+            const rightStickX = Math.abs(gp.axes[2]) > 0.15 ? gp.axes[2] : 0;
+            
+            // Buttons can be objects or raw values
+            const getBtn = (idx) => {
+                if (!gp.buttons[idx]) return 0;
+                return typeof gp.buttons[idx] === 'number' ? gp.buttons[idx] : gp.buttons[idx].value;
+            };
+
+            const rightTrigger = getBtn(7); // R2 / RT
+
+            // Yaw (Rotation)
+            // Apply angular acceleration to angular velocity
+            this.angularVelocity -= rightStickX * this.PHYSICS.ANGULAR_ACCEL * delta;
+            this.angularVelocity *= this.PHYSICS.ANGULAR_FRICTION;
+            this.group.rotation.y += this.angularVelocity * delta;
+
+            // Movement Directions relative to helicopter
+            // +Z is Forward visually for the helicopter mesh (Windshield is at +Z)
+            const forward = new THREE.Vector3(0, 0, 1).applyQuaternion(this.group.quaternion);
+            const right = new THREE.Vector3(1, 0, 0).applyQuaternion(this.group.quaternion);
+
+            // Left Stick Y: Up (-1) -> Forward, Down (+1) -> Back
+            // Left Stick X: Left (-1) -> Left, Right (+1) -> Right
+            this.velocity.addScaledVector(forward, -leftStickY * this.PHYSICS.ACCEL * delta);
+            this.velocity.addScaledVector(right, leftStickX * this.PHYSICS.ACCEL * delta);
+
+            // Vertical Lift vs Gravity
+            this.velocity.y -= this.PHYSICS.GRAVITY * delta;
+            this.velocity.y += rightTrigger * this.PHYSICS.LIFT * delta;
+
+            // Floor Collision
+            // Assuming landing pad or generic ground at Y=0 (or adjust based on scene)
+            // But let's just keep it simple: no falling below Y=2
+            if (this.group.position.y < 2) {
+                this.group.position.y = 2;
+                if (this.velocity.y < 0) this.velocity.y = 0;
+            }
+        }
+
+        // Apply Velocity
+        this.group.position.addScaledVector(this.velocity, delta);
         
-        const mid = new THREE.Vector3().addVectors(start, end).multiplyScalar(0.5);
-        mid.y += heightBoost; 
+        // Linear Friction (Air Drag)
+        this.velocity.multiplyScalar(this.PHYSICS.FRICTION);
+
+        // Visual Banking (Tilt)
+        // Convert global velocity to local to determine forward/sideways speed
+        const localVel = this.velocity.clone().applyQuaternion(this.group.quaternion.clone().invert());
         
-        const dir = new THREE.Vector3().subVectors(end, start).normalize();
-        const up = new THREE.Vector3(0, 1, 0);
-        const side = new THREE.Vector3().crossVectors(dir, up).normalize();
-        mid.add(side.multiplyScalar(lateralOffset));
+        // +LocalZ velocity (Forward) -> Pitch Down (+X Rotation)
+        const targetPitch = localVel.z * 0.02; 
+        // +LocalX velocity (Right) -> Roll Right (-Z Rotation)
+        const targetRoll = -localVel.x * 0.02;
+
+        // Clamp tilt
+        const clampedPitch = THREE.MathUtils.clamp(targetPitch, -this.PHYSICS.MAX_TILT, this.PHYSICS.MAX_TILT);
+        const clampedRoll = THREE.MathUtils.clamp(targetRoll, -this.PHYSICS.MAX_TILT, this.PHYSICS.MAX_TILT);
+
+        // Smoothly interpolate current body rotation to target
+        this.body.rotation.x = THREE.MathUtils.lerp(this.body.rotation.x, clampedPitch, delta * 3);
+        this.body.rotation.z = THREE.MathUtils.lerp(this.body.rotation.z, clampedRoll, delta * 3);
         
-        return new THREE.QuadraticBezierCurve3(start.clone(), mid, end.clone());
+        // Camera Gimbal auto-look
+        // Look slightly down and forward
+        const lookT = this.group.position.clone().add(new THREE.Vector3(0, -50, 100).applyQuaternion(this.group.quaternion));
+        this.gimbal.lookAt(lookT);
     }
 
     update(delta) {
-        this.timer += delta;
-        this.scanTime += delta;
-
+        // Rotor Animation
         if (this.rotorSpeed < this.targetRotorSpeed) {
             this.rotorSpeed += delta * 10;
         } else if (this.rotorSpeed > this.targetRotorSpeed) {
@@ -279,157 +349,23 @@ class NewsHelicopter {
             this.sound.setVolume(Math.min(1.0, this.rotorSpeed / 5));
         }
 
-        const targetWorld = new THREE.Vector3();
-        
-        if (this.state === 'ORBIT') {
-             targetWorld.copy(this.needlePos).setY(100); 
-             targetWorld.x += Math.sin(this.scanTime * 0.3) * 15;
-             targetWorld.y += Math.cos(this.scanTime * 0.23) * 10;
-        } else if (this.state === 'LANDING' || this.state === 'TAKEOFF' || this.state === 'PARKED') {
-             targetWorld.copy(this.landingPos);
+        if (this.isManual) {
+            this.targetRotorSpeed = 20;
+            this.updateHelicopterControls(delta);
         } else {
-             const forward = new THREE.Vector3(0, -1, 3).applyQuaternion(this.body.quaternion).normalize();
-             targetWorld.copy(this.group.position).add(forward.multiplyScalar(200));
-        }
-
-        this.gimbal.lookAt(targetWorld);
-
-        switch (this.state) {
-            case 'PARKED':
-                this.targetRotorSpeed = 0;
-                if (this.timer > 3) {
-                    this.state = 'SPOOLING';
-                    this.timer = 0;
-                }
-                break;
-
-            case 'SPOOLING':
-                this.targetRotorSpeed = 15;
-                if (this.timer > 5) {
-                    this.state = 'TAKEOFF';
-                    this.timer = 0;
-                }
-                break;
-
-            case 'TAKEOFF':
-                const takeoffH = this.landingPos.y + 25;
-                this.group.position.y += delta * 8;
-                this.body.rotation.x = -0.05; 
-                
-                if (this.group.position.y >= takeoffH) {
-                    this.state = 'ASCENT';
-                    this.timer = 0;
-                    
-                    const orbitStart = new THREE.Vector3(
-                        this.needlePos.x + this.orbitRadius, 
-                        this.needlePos.y, 
-                        this.needlePos.z
-                    );
-                    
-                    this.flightCurve = this.generateCurve(this.group.position, orbitStart, 0, -60);
-                    this.flightProgress = 0;
-                    this.flightDuration = 18;
-                }
-                break;
-
-            case 'ASCENT':
-                this.flightProgress += delta / this.flightDuration;
-                if (this.flightProgress >= 1) {
-                    this.flightProgress = 1;
-                    this.state = 'ORBIT';
-                    this.orbitAngle = 0;
-                    this.timer = 0;
-                } else if (this.flightCurve) {
-                    const t = this.flightProgress;
-                    const pos = this.flightCurve.getPoint(t);
-                    if (pos) {
-                        this.group.position.copy(pos);
-                        const tangent = this.flightCurve.getTangent(t).normalize();
-                        const lookTarget = pos.clone().add(tangent);
-                        this.group.lookAt(lookTarget);
-                    }
-                    this.body.rotation.x = THREE.MathUtils.lerp(this.body.rotation.x, 0.25, delta * 2);
-                    this.body.rotation.z = THREE.MathUtils.lerp(this.body.rotation.z, 0.3, delta * 2);
-                }
-                break;
-
-            case 'ORBIT':
-                const orbitDuration = 25; 
-                this.orbitAngle -= (delta / orbitDuration) * Math.PI * 2;
-                
-                const ox = this.needlePos.x + Math.cos(this.orbitAngle) * this.orbitRadius;
-                const oz = this.needlePos.z + Math.sin(this.orbitAngle) * this.orbitRadius;
-                
-                this.group.position.set(ox, this.needlePos.y, oz);
-                
-                const nextAngle = this.orbitAngle - 0.1;
-                const lookX = this.needlePos.x + Math.cos(nextAngle) * this.orbitRadius;
-                const lookZ = this.needlePos.z + Math.sin(nextAngle) * this.orbitRadius;
-                this.group.lookAt(lookX, this.needlePos.y, lookZ);
-                
-                this.body.rotation.z = 0.3; 
-                this.body.rotation.x = 0.1; 
-
-                if (this.timer > orbitDuration * 1.5) { 
-                    this.state = 'APPROACH';
-                    this.timer = 0;
-                    const exitPos = this.group.position.clone();
-                    const hoverPos = this.landingPos.clone().add(new THREE.Vector3(0, 30, 0));
-                    this.flightCurve = this.generateCurve(exitPos, hoverPos, 20, 60);
-                    this.flightProgress = 0;
-                    this.flightDuration = 20; 
-                }
-                break;
-
-            case 'APPROACH':
-                this.flightProgress += delta / this.flightDuration;
-                if (this.flightProgress >= 1) {
-                    this.flightProgress = 1;
-                    this.state = 'LANDING';
-                } else if (this.flightCurve) {
-                    const t = this.flightProgress;
-                    const pos = this.flightCurve.getPoint(t);
-                    if (pos) {
-                        this.group.position.copy(pos);
-                        const tangent = this.flightCurve.getTangent(t).normalize();
-                        this.group.lookAt(pos.clone().add(tangent));
-                    }
-                    const targetPitch = t > 0.8 ? -0.1 : 0.2; 
-                    this.body.rotation.x = THREE.MathUtils.lerp(this.body.rotation.x, targetPitch, delta * 2);
-                    this.body.rotation.z = THREE.MathUtils.lerp(this.body.rotation.z, -0.2, delta * 2); 
-                }
-                break;
-
-            case 'LANDING':
-                const distY = this.group.position.y - this.landingPos.y;
-                const descentSpeed = distY > 10 ? 8 : 2;
-                this.group.position.y -= delta * descentSpeed;
-                
-                const northPt = this.group.position.clone().add(new THREE.Vector3(0,0,-100));
-                const currentQ = this.group.quaternion.clone();
-                this.group.lookAt(northPt);
-                const targetQ = this.group.quaternion.clone();
-                this.group.quaternion.copy(currentQ.slerp(targetQ, delta * 2));
-
-                const flare = distY > 5 ? -0.15 : 0;
-                this.body.rotation.x = THREE.MathUtils.lerp(this.body.rotation.x, flare, delta * 3);
-                this.body.rotation.z = THREE.MathUtils.lerp(this.body.rotation.z, 0, delta * 3);
-
-                if (distY < 0.1) {
-                    this.group.position.copy(this.landingPos);
-                    this.state = 'COOLDOWN';
-                    this.timer = 0;
-                }
-                break;
-
-            case 'COOLDOWN':
-                this.targetRotorSpeed = 0;
-                this.body.rotation.set(0,0,0);
-                if (this.rotorSpeed < 0.1) {
-                    this.state = 'PARKED';
-                    this.timer = 0;
-                }
-                break;
+            // Parked State Logic
+            this.targetRotorSpeed = 0;
+            // Snap to landing pad if not controlled to ensure it doesn't drift
+            this.group.position.copy(this.landingPos);
+            this.group.rotation.set(0,0,0);
+            this.body.rotation.set(0,0,0);
+            this.velocity.set(0,0,0);
+            this.angularVelocity = 0;
+            
+            // Gimbal default look
+            const forward = new THREE.Vector3(0, -1, 3).applyQuaternion(this.body.quaternion).normalize();
+            const targetWorld = this.group.position.clone().add(forward.multiplyScalar(200));
+            this.gimbal.lookAt(targetWorld);
         }
     }
     
