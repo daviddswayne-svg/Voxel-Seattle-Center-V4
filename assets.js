@@ -1315,171 +1315,122 @@ const createChihulyGarden = (x, y, z, parent) => {
 const createPacificScienceCenter = (x, z, parent) => {
     const group = new THREE.Group();
     group.position.set(x, 0, z);
-    
-    const poolW = 90;
-    const poolL = 160;
-    const waterGeo = new THREE.BoxGeometry(poolW, 0.5, poolL);
+
+    // Scaling down: The previous one was 90x160.
+    // New scale: Pool ~60x60.
+    const poolSize = 60;
+    const poolHalf = poolSize / 2;
+
+    // 1. Water
+    const waterGeo = new THREE.BoxGeometry(poolSize, 0.4, poolSize);
     const waterMat = new THREE.MeshPhysicalMaterial({
-        color: 0x00AADD,
-        roughness: 0.05,
-        metalness: 0.1,
-        transmission: 0.8,
-        opacity: 0.8,
-        transparent: true,
-        reflectivity: 1.0
+        color: 0x00AADD, roughness: 0.1, metalness: 0.1,
+        transmission: 0.8, opacity: 0.8, transparent: true
     });
     const water = new THREE.Mesh(waterGeo, waterMat);
-    water.position.y = 0.25;
-    water.receiveShadow = true;
+    water.position.y = 0.2;
     group.add(water);
-    
-    createBox(poolW + 4, 1, poolL + 4, '#FFFFFF', 0, -0.5, 0, group);
-    createBox(poolW + 6, 0.2, poolL + 6, '#DDDDDD', 0, 0.1, 0, group); 
 
+    // 2. Pool Border/Floor
+    createBox(poolSize + 2, 0.2, poolSize + 2, '#FFFFFF', 0, 0, 0, group);
+    // Concrete Walls for pool
+    createBox(poolSize + 4, 1.5, 1, '#EEEEEE', 0, 0.75, poolHalf + 0.5, group); // Front
+    createBox(poolSize + 4, 1.5, 1, '#EEEEEE', 0, 0.75, -poolHalf - 0.5, group); // Back
+    createBox(1, 1.5, poolSize + 2, '#EEEEEE', poolHalf + 0.5, 0.75, 0, group); // Right
+    createBox(1, 1.5, poolSize + 2, '#EEEEEE', -poolHalf - 0.5, 0.75, 0, group); // Left
+
+    // 3. The Arches (Towers)
+    // We will generate voxels for ONE tower and instance it 5 times.
     const towerVoxels = [];
-    const vSize = 0.5; 
-    
-    const towerH = 50;
-    const baseWidth = 3;
-    const topWidth = 24; 
-    
-    for (let y = 0; y <= towerH; y += vSize) {
-        const t = y / towerH; 
+    const H = 32; // Height
+    const R_BASE = 3.5; // Base radius
+
+    // Vertical resolution
+    const vRes = 0.5;
+    for (let y = 0; y <= H; y += vRes) {
+        const t = y / H;
+
+        // Curve profile: Straight base, then Gothic curve
+        let r = R_BASE;
+        const curveStart = 0.3; // Stays straight for bottom 30%
+        if (t > curveStart) {
+            // Normalized t for curve part
+            const tc = (t - curveStart) / (1 - curveStart);
+            // Cosine curve to 0
+            r = R_BASE * Math.cos(tc * Math.PI / 2);
+        }
         
-        const flareFactor = Math.pow(Math.max(0, t - 0.3) / 0.7, 2.5);
-        const currentW = baseWidth + (topWidth - baseWidth) * flareFactor;
-        const halfW = currentW / 2;
-        
-        const isLatticeZone = t > 0.4;
-        
-        const limit = halfW + 0.5;
-        
-        for (let lx = -limit; lx <= limit; lx += vSize) {
-            for (let lz = -limit; lz <= limit; lz += vSize) {
-                const distX = Math.abs(lx);
-                const distZ = Math.abs(lz);
-                
-                const onEdge = (distX > halfW - 0.6) || (distZ > halfW - 0.6);
-                
-                if (!onEdge) continue; 
-                
-                let isSolid = false;
-                
-                if (isLatticeZone) {
-                    const scale = 2.0; 
-                    const pat = (Math.floor(lx/scale) + Math.floor(y/scale) + Math.floor(lz/scale)) % 2;
-                    
-                    if (t > 0.96) isSolid = true;
-                    else if (distX > halfW - 0.6 && distZ > halfW - 0.6) isSolid = true;
-                    else if (pat === 0) isSolid = true;
-                    
-                } else {
-                    if (distX > halfW - 0.8 && distZ > halfW - 0.8) isSolid = true;
-                }
-                
-                if (isSolid) {
-                    towerVoxels.push({x: lx, y: y, z: lz});
-                }
+        // Ensure strictly non-negative
+        if (r < 0.1) r = 0.1;
+
+        // Generate the 4 ribs (Corners of the square cross-section)
+        const offsets = [
+            {x: r, z: r}, {x: -r, z: r}, {x: r, z: -r}, {x: -r, z: -r}
+        ];
+
+        offsets.forEach(off => {
+            towerVoxels.push({x: off.x, y: y, z: off.z});
+        });
+
+        // Horizontal Lattice Rings
+        // Add a ring every 3 units
+        if (y % 3.0 < vRes) {
+            // Fill perimeter square
+            const step = 0.4;
+            for (let dx = -r; dx <= r; dx += step) {
+                towerVoxels.push({x: dx, y: y, z: r});
+                towerVoxels.push({x: dx, y: y, z: -r});
+            }
+            for (let dz = -r; dz <= r; dz += step) {
+                towerVoxels.push({x: r, y: y, z: dz});
+                towerVoxels.push({x: -r, y: y, z: dz});
             }
         }
+        
+        // Add a central spire tip at the very top
+        if (y > H - 1) {
+            towerVoxels.push({x: 0, y: y, z: 0});
+        }
     }
+
+    // Create Instance Mesh for Towers
+    const boxGeo = new THREE.BoxGeometry(0.3, 0.5, 0.3);
+    const boxMat = new THREE.MeshStandardMaterial({ color: '#FFFFFF', roughness: 0.2 });
+    const towerMesh = new THREE.InstancedMesh(boxGeo, boxMat, towerVoxels.length * 5);
     
-    const towerGeo = new THREE.BoxGeometry(vSize, vSize, vSize);
-    const towerMat = new THREE.MeshStandardMaterial({ color: '#FFFFFF', roughness: 0.1 });
-    const towerMesh = new THREE.InstancedMesh(towerGeo, towerMat, towerVoxels.length * 5);
-    
-    const dummy = new THREE.Object3D();
+    // Tower Locations in the pool
+    // 5 Towers: Center, and 4 corners
+    const spacing = 14;
+    const locations = [
+        {x: 0, z: 0},
+        {x: spacing, z: spacing},
+        {x: -spacing, z: spacing},
+        {x: spacing, z: -spacing},
+        {x: -spacing, z: -spacing}
+    ];
+
     let idx = 0;
+    const dummy = new THREE.Object3D();
     
-    for (let i = 0; i < 5; i++) {
-        const zPos = (i - 2) * 30; 
+    locations.forEach(loc => {
         towerVoxels.forEach(v => {
-            if (v && typeof v.x === 'number') {
-                dummy.position.set(v.x, v.y + 0.5, v.z + zPos); 
-                dummy.updateMatrix();
-                towerMesh.setMatrixAt(idx++, dummy.matrix);
-            }
+            dummy.position.set(v.x + loc.x, v.y + 0.2, v.z + loc.z);
+            dummy.scale.set(1, 1, 1);
+            dummy.updateMatrix();
+            towerMesh.setMatrixAt(idx++, dummy.matrix);
         });
-    }
+    });
+    
     towerMesh.castShadow = true;
     towerMesh.receiveShadow = true;
     group.add(towerMesh);
-    
-    const fountainVoxels = [];
-    const fSize = 0.25;
-    
-    const fHeight = 6;
-    for (let fy = 0; fy <= fHeight; fy += fSize) {
-        const t = fy / fHeight;
-        const r = 2.5 * Math.sin(t * Math.PI); 
-        
-        const ribs = 8;
-        for(let rIdx = 0; rIdx < ribs; rIdx++) {
-            const angle = (rIdx / ribs) * Math.PI * 2;
-            const fx = Math.cos(angle) * r;
-            const fz = Math.sin(angle) * r;
-            fountainVoxels.push({x: fx, y: fy, z: fz});
-        }
-    }
-    
-    const fGeo = new THREE.BoxGeometry(fSize, fSize, fSize);
-    const fMat = new THREE.MeshStandardMaterial({ color: '#FFFFFF', emissive: '#FFFFFF', emissiveIntensity: 0.5 });
-    const fMesh = new THREE.InstancedMesh(fGeo, fMat, fountainVoxels.length * 4);
-    idx = 0;
-    
-    for(let i=0; i<4; i++) {
-        const zPos = (i - 1.5) * 30; 
-        fountainVoxels.forEach(v => {
-            if (v && typeof v.x === 'number') {
-                dummy.position.set(v.x, v.y + 0.5, v.z + zPos);
-                dummy.updateMatrix();
-                fMesh.setMatrixAt(idx++, dummy.matrix);
-            }
-        });
-    }
-    group.add(fMesh);
-    
-    const wallL = 160;
-    const wallH = 18;
-    const wallW = 4;
-    const wVoxels = [];
-    const wvSize = 1.0;
-    
-    for(let wy = 0; wy < wallH; wy += wvSize) {
-        for(let wz = -wallL/2; wz < wallL/2; wz += wvSize) {
-            const diag = (wy + wz); 
-            const depthMod = Math.abs(diag % 8 - 4) < 2 ? 0 : 1; 
-            
-            for(let wx = 0; wx < wallW + depthMod; wx += wvSize) {
-                wVoxels.push({x: wx, y: wy, z: wz});
-            }
-        }
-    }
-    
-    const wGeo = new THREE.BoxGeometry(wvSize, wvSize, wvSize);
-    const wMat = new THREE.MeshStandardMaterial({ color: '#F0F0F0', roughness: 0.6 }); 
-    const wMesh = new THREE.InstancedMesh(wGeo, wMat, wVoxels.length * 2);
-    
-    idx = 0;
-    wVoxels.forEach(v => {
-        if (v && typeof v.x === 'number') {
-            dummy.position.set(v.x + (poolW/2 + 2), v.y + 0.5, v.z);
-            dummy.rotation.set(0,0,0);
-            dummy.updateMatrix();
-            wMesh.setMatrixAt(idx++, dummy.matrix);
-        }
+
+    // 4. Floating Fountains (Simple white blocks near bases)
+    const fGroup = new THREE.Group();
+    locations.forEach(loc => {
+        createBox(2, 0.5, 2, '#FFFFFF', loc.x, 0.5, loc.z, fGroup);
     });
-    wVoxels.forEach(v => {
-        if (v && typeof v.x === 'number') {
-            dummy.position.set(-(v.x + (poolW/2 + 2)), v.y + 0.5, v.z);
-            dummy.rotation.set(0, Math.PI, 0); 
-            dummy.updateMatrix();
-            wMesh.setMatrixAt(idx++, dummy.matrix);
-        }
-    });
-    wMesh.castShadow = true;
-    wMesh.receiveShadow = true;
-    group.add(wMesh);
+    group.add(fGroup);
 
     if (parent) parent.add(group);
 };
