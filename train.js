@@ -59,6 +59,8 @@ export class Train {
 
         // Update Car Positions
         this.cars.forEach((car, index) => {
+            if (!this.curve || !this.curve.getPointAt) return;
+
             // Calculate 't' for this car. 
             // We assume car[0] is at 'this.progress' and others trail behind it relative to the track curve.
             // Note: When moving backwards (direction -1), this simple offset logic means the train 
@@ -71,7 +73,7 @@ export class Train {
             const position = this.curve.getPointAt(clampedT);
             const tangent = this.curve.getTangentAt(clampedT);
             
-            if (position && tangent) {
+            if (position && tangent && typeof position.x === 'number') {
                 car.group.position.copy(position);
                 
                 // Orient car to face the direction of the track tangent

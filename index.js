@@ -1,10 +1,9 @@
 
-
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
 import { TRACK_LEFT, TRACK_RIGHT, COLORS } from './constants.js';
-import { createTrack, createEnvironment, animatedObjects } from './assets.js';
+import { createTrack, createEnvironment, animatedObjects, clearAnimatedObjects } from './assets.js';
 import { Train } from './train.js';
 import { setupAudio } from './audio.js';
 
@@ -34,6 +33,9 @@ renderer.toneMappingExposure = 1.1;
 root.appendChild(renderer.domElement);
 
 const scene = new THREE.Scene();
+
+// Reset animation objects to prevent stale references
+clearAnimatedObjects();
 
 // Golden Hour Sky
 const GOLDEN_SKY = new THREE.Color('#FFAB76');

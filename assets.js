@@ -1,11 +1,14 @@
 
-
 import * as THREE from 'three';
 import { COLORS, TRACK_HEIGHT, PIER_SPACING, CarType, TRACK_LEFT, TRACK_RIGHT, TAXI_PATH } from './constants.js';
 import { createBox, createCylinder, createPlane } from './utils.js';
 
 // Global list of objects requiring animation updates
 export const animatedObjects = [];
+
+export function clearAnimatedObjects() {
+    animatedObjects.length = 0;
+}
 
 // --- TRACK ---
 export function createTrack(curve, scene) {
@@ -454,11 +457,6 @@ class NewsHelicopter {
     }
 }
 
-// ... rest of file ... (createCarMesh and everything else remains unchanged, assuming I output the whole file or just the necessary part. Since assets.js is huge, I will return the updated NewsHelicopter class and imports, but typically I should output the full file if it's not too huge. However, given token limits and the explicit request to fix errors, I will focus on providing the whole file content to ensure no context is lost if I were to partial it. But assets.js is very large. I will use the strategy of outputting the whole file since I already have it in context and it's safer for "permanent fixes".)
-// Actually, re-reading the "OPERATIONAL RULES": "If a requested file is large: Provide the specific function/class updates completely...".
-// I will just output the full file to be safe as I have the content.
-
-// --- CAR (Alweg Style - Mid Century Modern) ---
 export function createCarMesh(type, color) {
   const group = new THREE.Group();
   const isHead = type === CarType.HEAD;
@@ -636,10 +634,13 @@ class TrafficCar {
     this.progress += this.speed * delta * LOOP_SPEED_SCALE;
     if (this.progress > 1) this.progress -= 1;
 
+    // Guard against potential undefined curve points during initialization or reload
+    if (!this.curve || !this.curve.getPointAt) return;
+
     const pos = this.curve.getPointAt(this.progress);
     const nextPos = this.curve.getPointAt((this.progress + 0.005) % 1);
 
-    if (pos && nextPos) {
+    if (pos && nextPos && typeof pos.x === 'number') {
         this.group.position.copy(pos);
         const m = new THREE.Matrix4();
         m.lookAt(pos, nextPos, new THREE.Vector3(0, 1, 0));
@@ -732,10 +733,12 @@ export class HeroTaxi {
         this.progress += this.speed * delta * LOOP_SPEED_SCALE;
         if (this.progress > 1) this.progress -= 1;
 
+        if (!this.curve || !this.curve.getPointAt) return;
+
         const pos = this.curve.getPointAt(this.progress);
         const nextPos = this.curve.getPointAt((this.progress + 0.005) % 1);
 
-        if (pos && nextPos) {
+        if (pos && nextPos && typeof pos.x === 'number') {
             this.group.position.copy(pos);
             const m = new THREE.Matrix4();
             m.lookAt(pos, nextPos, new THREE.Vector3(0, 1, 0));
@@ -2392,7 +2395,6 @@ class WestlakeMall {
             colsZ.forEach(cz => {
                 if (Math.abs(cx) < 8) return; 
                 // Pillar from ground (0) to roof
-                // Replaced 'y3' (Level 3) with 0 as the starting Y, and adjusted height.
                 createBox(pillarW, roofY, pillarW, pillarColor, cx, roofY / 2, cz, this.group);
             });
         });
@@ -2510,14 +2512,9 @@ class WestlakeMall {
     }
 
     buildEscalators(yBot, yTop) {
-        const escGroup = new THREE.Group();
-        this.group.add(escGroup);
-        
         const xOffset = 2.5; // Two escalators side by side
         const zStart = 10;
         const zEnd = -8;
-        const height = yTop - yBot;
-        const length = zStart - zEnd;
         
         // 1. Gear Chambers (Under Glass) at Bottom
         this.createGearChamber(0, yBot - 1.5, zStart + 2);
@@ -2533,7 +2530,6 @@ class WestlakeMall {
 
     createGearChamber(x, y, z) {
         // Glass Cover
-        const glassSize = 6;
         const glass = createBox(8, 0.2, 6, '#88CCFF', x, y + 1.5, z, this.group);
         glass.material.transparent = true;
         glass.material.opacity = 0.3;
@@ -2542,9 +2538,9 @@ class WestlakeMall {
         const redStone = '#CC2222';
         const gold = '#FFAA00';
         
-        const g1 = this.createGear(x - 2, y, z - 1, 1.2, redStone);
-        const g2 = this.createGear(x + 2, y, z + 1, 1.2, redStone);
-        const g3 = this.createGear(x, y, z, 0.8, gold);
+        this.createGear(x - 2, y, z - 1, 1.2, redStone);
+        this.createGear(x + 2, y, z + 1, 1.2, redStone);
+        this.createGear(x, y, z, 0.8, gold);
         
         // Shafts
         createCylinder(0.2, 0.2, 4, 8, '#555', x - 2, y-2, z - 1, this.group);
