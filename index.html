@@ -1,12 +1,23 @@
+
 <!DOCTYPE html>
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
     <title>Seattle Voxel Monorail</title>
     <style>
-      html, body { width: 100%; height: 100%; margin: 0; padding: 0; }
-      body { overflow: hidden; background-color: #87CEEB; font-family: sans-serif; touch-action: none; }
+      html, body { 
+        width: 100%; 
+        height: 100%; 
+        margin: 0; 
+        padding: 0; 
+        overflow: hidden; 
+        background-color: #87CEEB; 
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+        touch-action: none; 
+        -webkit-user-select: none;
+        user-select: none;
+      }
       
       /* Canvas Container - explicit low z-index */
       #root { 
@@ -19,7 +30,7 @@
         overflow: hidden;
       }
       
-      /* UI Overlay */
+      /* UI Overlay Container */
       .ui-overlay {
         position: absolute;
         top: 0;
@@ -35,36 +46,70 @@
         align-items: flex-start;
       }
 
+      /* Information Card */
       .ui-card {
-        background-color: rgba(255, 255, 255, 0.95);
-        padding: 2.5rem;
+        background-color: rgba(255, 255, 255, 0.90);
+        padding: 2rem;
         border-radius: 1.5rem;
         box-shadow: 0 10px 25px rgba(0,0,0,0.15);
         backdrop-filter: blur(12px);
+        -webkit-backdrop-filter: blur(12px);
         pointer-events: auto;
-        max-width: 100%; 
         width: max-content;
+        max-width: 450px;
         max-height: calc(100vh - 4rem);
         overflow-y: auto;
+        transition: all 0.3s ease;
       }
 
-      .ui-title { font-size: 3.5rem; font-weight: 800; color: #1f2937; margin: 0; line-height: 1.1; letter-spacing: -0.02em; }
-      .ui-subtitle { font-size: 1.5rem; color: #4b5563; margin-top: 0.75rem; margin-bottom: 2rem; }
-      .ui-label { font-size: 1.125rem; font-weight: 700; color: #6b7280; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 1rem; }
-      .btn-group { display: flex; gap: 1rem; flex-wrap: wrap; }
+      .ui-title { 
+        font-size: 3rem; 
+        font-weight: 800; 
+        color: #1f2937; 
+        margin: 0; 
+        line-height: 1.0; 
+        letter-spacing: -0.03em; 
+      }
+      
+      .ui-subtitle { 
+        font-size: 1.25rem; 
+        color: #4b5563; 
+        margin-top: 0.5rem; 
+        margin-bottom: 1.5rem; 
+        font-weight: 500;
+      }
+      
+      .ui-label { 
+        font-size: 0.875rem; 
+        font-weight: 700; 
+        color: #6b7280; 
+        text-transform: uppercase; 
+        letter-spacing: 0.05em; 
+        margin-bottom: 0.75rem; 
+      }
+      
+      .btn-group { 
+        display: flex; 
+        gap: 0.75rem; 
+        flex-wrap: wrap; 
+      }
+      
       .btn {
-        padding: 1rem 1.75rem;
-        font-size: 1.25rem;
+        padding: 0.75rem 1.25rem;
+        font-size: 1rem;
         border-radius: 0.75rem;
         border: none;
         cursor: pointer;
-        transition: background-color 0.2s;
+        transition: transform 0.1s, background-color 0.2s;
         display: flex;
         align-items: center;
-        gap: 0.75rem;
+        justify-content: center;
+        gap: 0.5rem;
         font-weight: 600;
         pointer-events: auto;
+        white-space: nowrap;
       }
+      .btn:active { transform: scale(0.96); }
       .btn-default { background-color: #e5e7eb; color: #374151; }
       .btn-default:hover { background-color: #d1d5db; }
       .btn-active-orbit { background-color: #1f2937; color: white; }
@@ -85,19 +130,19 @@
       }
 
       .btn-round {
-        width: 4.5rem;
-        height: 4.5rem;
+        width: 4rem;
+        height: 4rem;
         border-radius: 50%;
         border: none;
         background: white;
         color: #1f2937;
         box-shadow: 0 4px 12px rgba(0,0,0,0.2);
         cursor: pointer;
-        font-size: 2.25rem;
+        font-size: 2rem;
         display: flex;
         align-items: center;
         justify-content: center;
-        transition: transform 0.1s, background-color 0.2s, color 0.2s;
+        transition: transform 0.1s, background-color 0.2s;
         pointer-events: auto;
       }
       .btn-round:hover { background-color: #f3f4f6; transform: scale(1.05); }
@@ -115,13 +160,13 @@
         pointer-events: auto;
       }
       .btn-zoom {
-        width: 4.5rem;
-        height: 4.5rem;
+        width: 4rem;
+        height: 4rem;
         background-color: white;
         color: #1f2937;
         border: none;
         border-radius: 0.75rem;
-        font-size: 2.5rem;
+        font-size: 2rem;
         font-weight: bold;
         line-height: 1;
         cursor: pointer;
@@ -141,11 +186,11 @@
         bottom: 3rem;
         left: 50%;
         transform: translateX(-50%);
-        background-color: rgba(0,0,0,0.8);
+        background-color: rgba(31, 41, 55, 0.9);
         color: white;
-        padding: 1.25rem 2.5rem;
-        border-radius: 3rem;
-        font-size: 1.25rem;
+        padding: 1rem 2rem;
+        border-radius: 2rem;
+        font-size: 1.125rem;
         font-weight: 600;
         pointer-events: none;
         transition: opacity 0.5s;
@@ -153,6 +198,86 @@
         align-items: center;
         gap: 0.75rem;
         z-index: 1001;
+        white-space: nowrap;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+      }
+
+      /* Tablet Responsiveness (1024px and down) */
+      @media (max-width: 1024px) {
+        .ui-overlay { padding: 1.5rem; }
+        .ui-card { padding: 1.75rem; max-width: 400px; }
+        .ui-title { font-size: 2.5rem; }
+        .btn { padding: 0.7rem 1.1rem; font-size: 0.95rem; }
+        .btn-round { width: 3.5rem; height: 3.5rem; font-size: 1.75rem; }
+        .btn-zoom { width: 3.5rem; height: 3.5rem; font-size: 1.75rem; }
+      }
+
+      /* Mobile Responsiveness (768px and down) */
+      @media (max-width: 768px) {
+        .ui-overlay { 
+          padding: 1rem;
+          /* On mobile, align to top but keep width manageable */
+        }
+
+        .ui-card {
+          width: 100%;
+          max-width: none;
+          padding: 1.25rem;
+          border-radius: 1.25rem;
+          background-color: rgba(255, 255, 255, 0.95);
+        }
+
+        .ui-title { font-size: 1.75rem; }
+        .ui-subtitle { font-size: 1rem; margin-bottom: 1rem; }
+        .ui-label { font-size: 0.8rem; margin-bottom: 0.5rem; }
+        
+        .btn-group { gap: 0.5rem; }
+        
+        .btn {
+          flex: 1 1 auto; /* Grow to fill space */
+          padding: 0.75rem 0.75rem;
+          font-size: 0.9rem;
+          min-width: 80px; /* Minimum touch target width approximation */
+        }
+
+        /* Top Right Controls */
+        .round-btn-container {
+          top: 1rem;
+          right: 1rem;
+          gap: 0.75rem;
+        }
+        .btn-round {
+          width: 3rem;
+          height: 3rem;
+          font-size: 1.5rem;
+        }
+
+        /* Bottom Right Controls */
+        .zoom-controls {
+          bottom: 1.5rem;
+          right: 1rem;
+        }
+        .btn-zoom {
+          width: 3rem;
+          height: 3rem;
+          font-size: 1.5rem;
+        }
+
+        /* Hint */
+        #audio-hint {
+            font-size: 0.9rem;
+            padding: 0.75rem 1.5rem;
+            bottom: 6rem;
+            width: auto;
+            max-width: 90%;
+            justify-content: center;
+        }
+      }
+      
+      /* Small Mobile (380px and down) */
+      @media (max-width: 380px) {
+        .ui-title { font-size: 1.5rem; }
+        .btn { font-size: 0.8rem; padding: 0.6rem; }
       }
     </style>
     <script type="importmap">
@@ -185,18 +310,18 @@
     <!-- UI Overlay -->
     <div class="ui-overlay">
       <div class="ui-card">
-        <h1 class="ui-title">Seattle Monorail 1962</h1>
-        <p class="ui-subtitle">Alweg System Simulation</p>
+        <h1 class="ui-title">Seattle Monorail</h1>
+        <p class="ui-subtitle">1962 World's Fair Edition</p>
         
         <div>
-           <div class="ui-label">Camera View</div>
+           <div class="ui-label">Camera Views</div>
            <div class="btn-group">
               <button id="btn-orbit" class="btn btn-active-orbit">Orbit</button>
               <button id="btn-red" class="btn btn-default">Red POV</button>
               <button id="btn-blue" class="btn btn-default">Blue POV</button>
-              <button id="btn-elevator" class="btn btn-default">Elevator POV</button>
-              <button id="btn-taxi" class="btn btn-default">Taxi POV</button>
-              <button id="btn-heli" class="btn btn-default">Heli Cam</button>
+              <button id="btn-elevator" class="btn btn-default">Elevator</button>
+              <button id="btn-taxi" class="btn btn-default">Taxi</button>
+              <button id="btn-heli" class="btn btn-default">Heli</button>
            </div>
         </div>
       </div>
